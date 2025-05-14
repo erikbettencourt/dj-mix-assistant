@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Disable momentum scrolling */
+* {
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior: none;
+}
+
+/* Ensure smooth scrolling for intentional scroll behavior */
+html {
+  scroll-behavior: smooth;
+}

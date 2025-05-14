@@ -2,8 +2,6 @@ DJ Mix Assistant v1.0.0
 
 A web-based tool to help DJs build harmonically mixed sets using BPM-aware key shifting and Camelot Wheel logic.
 
---- Features ---
-
 Core Functionality
 - Analyze DJ XML library files for BPM and key data
 - Detect compatible tracks using Camelot Wheel rules

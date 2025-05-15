@@ -137,6 +137,13 @@ function App() {
   const handleBpmChange = (value: string) => {
     if (!selectedTrack) return;
 
+    if (value === '') {
+      setEditedBpm(String(selectedTrack.bpm));
+      const compatible = findCompatibleTracks(selectedTrack, tracks);
+      setCompatibleTracks(compatible);
+      return;
+    }
+
     setEditedBpm(value);
     
     // Only update compatible tracks if the value is a valid number
@@ -284,7 +291,7 @@ function App() {
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            value={editedBpm !== null ? editedBpm : ''}
+                            value={editedBpm || ''}
                             onChange={(e) => handleBpmChange(e.target.value)}
                             className={`
                               w-24 text-lg font-mono rounded px-2 py-1
@@ -294,7 +301,6 @@ function App() {
                               }
                               border focus:outline-none focus:ring-2 focus:ring-primary-500
                             `}
-                            placeholder="Enter BPM"
                           />
                           {editedBpm !== String(selectedTrack.bpm) && (
                             <div className="flex items-center gap-2">

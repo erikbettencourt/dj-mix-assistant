@@ -4,7 +4,7 @@ import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot } from './utils/camelotLogic';
 import { findCompatibleTracks } from './utils/bpmCalculator';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Plus, Minus } from 'lucide-react';
 
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -163,6 +163,19 @@ function App() {
     }
   };
 
+  // Handle BPM increment/decrement
+  const handleBpmStep = (increment: boolean) => {
+    if (!selectedTrack || !editedBpm) return;
+
+    const currentBpm = parseFloat(editedBpm);
+    if (isNaN(currentBpm)) return;
+
+    const newBpm = increment ? currentBpm + 1 : currentBpm - 1;
+    if (newBpm > 0) {
+      handleBpmChange(String(newBpm));
+    }
+  };
+
   // Reset BPM to original value
   const handleResetBpm = () => {
     if (!selectedTrack) return;
@@ -287,21 +300,37 @@ function App() {
                       <div>
                         <span className="text-sm text-gray-400 mb-1 block">BPM</span>
                         <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={editedBpm || ''}
-                            onChange={(e) => handleBpmChange(e.target.value)}
-                            className={`
-                              w-24 text-lg font-mono rounded px-2 py-1
-                              ${editedBpm !== String(selectedTrack.bpm)
-                                ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
-                                : 'bg-gray-800 border-gray-700 text-gray-200'
-                              }
-                              border focus:outline-none focus:ring-2 focus:ring-primary-500
-                            `}
-                          />
+                          <div className="flex items-center">
+                            <button
+                              onClick={() => handleBpmStep(false)}
+                              className="p-1.5 hover:bg-gray-800 rounded-l text-gray-400 hover:text-white border border-r-0 border-gray-700"
+                              title="Decrease BPM"
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={editedBpm || ''}
+                              onChange={(e) => handleBpmChange(e.target.value)}
+                              className={`
+                                w-24 text-lg font-mono rounded-none px-2 py-1
+                                ${editedBpm !== String(selectedTrack.bpm)
+                                  ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
+                                  : 'bg-gray-800 border-gray-700 text-gray-200'
+                                }
+                                border-y focus:outline-none focus:ring-2 focus:ring-primary-500
+                              `}
+                            />
+                            <button
+                              onClick={() => handleBpmStep(true)}
+                              className="p-1.5 hover:bg-gray-800 rounded-r text-gray-400 hover:text-white border border-l-0 border-gray-700"
+                              title="Increase BPM"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
                           {editedBpm !== String(selectedTrack.bpm) && (
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-500 font-mono">

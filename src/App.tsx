@@ -385,9 +385,12 @@ function App() {
                           {editedBpm !== null && compatibleTracks.length > 0
                             ? compatibleTracks[0].shiftedCamelotKey
                             : selectedTrack.camelotKey}
-                          <span className="text-gray-500 ml-2">
-                            ({selectedTrack.camelotKey})
-                          </span>
+                          {editedBpm !== null && compatibleTracks.length > 0 && 
+                           compatibleTracks[0].shiftedCamelotKey !== selectedTrack.camelotKey && (
+                            <span className="text-gray-500 ml-2">
+                              ({selectedTrack.camelotKey})
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>

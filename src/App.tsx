@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
 import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot } from './utils/camelotLogic';
@@ -26,6 +26,7 @@ function TrackDetail() {
 
 function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [compatibleTracks, setCompatibleTracks] = useState<CompatibleTrack[]>([]);
@@ -34,6 +35,42 @@ function App() {
   const [editedBpm, setEditedBpm] = useState<number | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | undefined>();
   const [selectedTrackHistory, setSelectedTrackHistory] = useState<CompatibleTrack[]>([]);
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    if (location.pathname === '/') {
+      setSelectedTrack(null);
+      setCompatibleTracks([]);
+      setEditedBpm(null);
+      setSelectedTrackHistory([]);
+    } else {
+      const trackId = location.pathname.split('/').pop();
+      if (trackId && selectedTrackHistory.length > 0) {
+        const historyIndex = selectedTrackHistory.findIndex(t => t.id === trackId);
+        if (historyIndex !== -1) {
+          const newHistory = selectedTrackHistory.slice(0, historyIndex + 1);
+          const track = selectedTrackHistory[historyIndex];
+          
+          setSelectedTrack({
+            ...track,
+            camelotKey: convertToCalemot(track.key)
+          });
+          setEditedBpm(track.adjustedBpm);
+          
+          const modifiedTrack = {
+            ...track,
+            bpm: track.adjustedBpm,
+            key: track.shiftedKey,
+            camelotKey: track.shiftedCamelotKey
+          };
+          
+          const compatible = findCompatibleTracks(modifiedTrack, tracks);
+          setCompatibleTracks(compatible);
+          setSelectedTrackHistory(newHistory);
+        }
+      }
+    }
+  }, [location, tracks]);
 
   // Handle file upload
   const handleFileUpload = async (file: File) => {

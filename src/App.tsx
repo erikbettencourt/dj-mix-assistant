@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, useParams, Navigate, useLocation } from 'react-router-dom';
 import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
-import { convertToCalemot } from './utils/camelotLogic';
+import { convertToCalemot, calculateKeyShift, getCamelotKeyInfo } from './utils/camelotLogic';
 import { findCompatibleTracks } from './utils/bpmCalculator';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -18,10 +18,7 @@ function TrackDetail() {
   const { trackId } = useParams();
   const navigate = useNavigate();
   
-  // Get track data and other state from parent App component
-  // This will be passed through context in the next step
-  
-  return null; // Temporary return until we implement the context
+  return null;
 }
 
 function App() {
@@ -35,6 +32,7 @@ function App() {
   const [editedBpm, setEditedBpm] = useState<number | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | undefined>();
   const [selectedTrackHistory, setSelectedTrackHistory] = useState<CompatibleTrack[]>([]);
+  const [transpose, setTranspose] = useState<number>(0);
 
   // Listen for browser back/forward navigation
   useEffect(() => {
@@ -43,6 +41,7 @@ function App() {
       setCompatibleTracks([]);
       setEditedBpm(null);
       setSelectedTrackHistory([]);
+      setTranspose(0);
     } else {
       const trackId = location.pathname.split('/').pop();
       if (trackId) {
@@ -100,6 +99,7 @@ function App() {
       setCompatibleTracks([]);
       setEditedBpm(null);
       setSelectedTrackHistory([]);
+      setTranspose(0);
       navigate('/');
     } catch (error) {
       console.error('Error parsing XML file:', error);
@@ -117,6 +117,7 @@ function App() {
     setCompatibleTracks([]);
     setEditedBpm(null);
     setSelectedTrackHistory([]);
+    setTranspose(0);
     setError(null);
     navigate('/');
   };
@@ -130,6 +131,7 @@ function App() {
     setCurrentFileName(undefined);
     setError(null);
     setSelectedTrackHistory([]);
+    setTranspose(0);
     navigate('/');
   };
 
@@ -140,6 +142,7 @@ function App() {
       setCompatibleTracks([]);
       setEditedBpm(null);
       setSelectedTrackHistory([]);
+      setTranspose(0);
       navigate('/');
       return;
     }
@@ -151,6 +154,7 @@ function App() {
     
     setSelectedTrack(trackWithCamelot);
     setEditedBpm(null);
+    setTranspose(0);
     
     // Find compatible tracks
     const compatible = findCompatibleTracks(trackWithCamelot, tracks);
@@ -182,6 +186,7 @@ function App() {
       
       setSelectedTrack(trackWithCamelot);
       setEditedBpm(track.adjustedBpm);
+      setTranspose(0);
       
       // Find compatible tracks with the adjusted BPM and shifted key
       const modifiedTrack = {
@@ -219,10 +224,51 @@ function App() {
     setCompatibleTracks(compatible);
   };
 
+  // Handle transpose change
+  const handleTransposeChange = (newTranspose: number) => {
+    if (!selectedTrack || newTranspose < -3 || newTranspose > 3) return;
+
+    setTranspose(newTranspose);
+    
+    const keyInfo = getCamelotKeyInfo(selectedTrack.key);
+    if (!keyInfo) return;
+
+    // Calculate new Camelot number based on transposition
+    let newNumber = keyInfo.number;
+    for (let i = 0; i < Math.abs(newTranspose); i++) {
+      if (newTranspose > 0) {
+        newNumber = newNumber === 12 ? 1 : newNumber + 1;
+      } else {
+        newNumber = newNumber === 1 ? 12 : newNumber - 1;
+      }
+    }
+
+    const newCamelotKey = `${newNumber}${keyInfo.letter}`;
+    
+    // Create modified reference track with transposed key
+    const modifiedTrack = {
+      ...selectedTrack,
+      key: newCamelotKey,
+      camelotKey: newCamelotKey
+    };
+
+    // Recalculate compatible tracks with transposed key
+    const compatible = findCompatibleTracks(modifiedTrack, tracks);
+    setCompatibleTracks(compatible);
+  };
+
   // Reset BPM to original value
   const handleResetBpm = () => {
     if (!selectedTrack) return;
     setEditedBpm(null);
+    const compatible = findCompatibleTracks(selectedTrack, tracks);
+    setCompatibleTracks(compatible);
+  };
+
+  // Reset transpose to 0
+  const handleResetTranspose = () => {
+    if (!selectedTrack) return;
+    setTranspose(0);
     const compatible = findCompatibleTracks(selectedTrack, tracks);
     setCompatibleTracks(compatible);
   };
@@ -233,6 +279,7 @@ function App() {
     setCompatibleTracks([]);
     setEditedBpm(null);
     setSelectedTrackHistory([]);
+    setTranspose(0);
     navigate('/');
   };
 
@@ -253,6 +300,7 @@ function App() {
       camelotKey: convertToCalemot(track.key)
     });
     setEditedBpm(track.adjustedBpm);
+    setTranspose(0);
     
     const modifiedTrack = {
       ...track,
@@ -392,6 +440,45 @@ function App() {
                             </span>
                           )}
                         </p>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-400 mb-1 block">Transpose</span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            <button
+                              onClick={() => handleTransposeChange(transpose - 1)}
+                              disabled={transpose <= -3}
+                              className="p-1.5 hover:bg-gray-800 rounded-l-md disabled:opacity-50 disabled:hover:bg-transparent"
+                            >
+                              <ChevronDown size={16} className="text-gray-400" />
+                            </button>
+                            <span className={`
+                              w-8 text-center font-mono
+                              ${transpose !== 0 
+                                ? 'text-primary-400' 
+                                : 'text-gray-200'
+                              }
+                            `}>
+                              {transpose > 0 ? `+${transpose}` : transpose}
+                            </span>
+                            <button
+                              onClick={() => handleTransposeChange(transpose + 1)}
+                              disabled={transpose >= 3}
+                              className="p-1.5 hover:bg-gray-800 rounded-r-md disabled:opacity-50 disabled:hover:bg-transparent"
+                            >
+                              <ChevronUp size={16} className="text-gray-400" />
+                            </button>
+                          </div>
+                          {transpose !== 0 && (
+                            <button
+                              onClick={handleResetTranspose}
+                              className="p-1.5 hover:bg-gray-800 rounded-full transition-colors group"
+                              title="Reset transpose"
+                            >
+                              <RotateCcw size={16} className="text-gray-400 group-hover:text-white" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

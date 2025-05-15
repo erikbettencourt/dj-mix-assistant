@@ -4,7 +4,7 @@ import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot, calculateKeyShift, getCamelotKeyInfo } from './utils/camelotLogic';
 import { findCompatibleTracks } from './utils/bpmCalculator';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Music, ArrowDown, ArrowUp } from 'lucide-react';
 
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -335,6 +335,12 @@ function App() {
     return `${newNumber}${keyInfo.letter}`;
   };
 
+  // Calculate BPM change percentage
+  const getBpmChangePercentage = () => {
+    if (!selectedTrack || !editedBpm) return 0;
+    return ((editedBpm - selectedTrack.bpm) / selectedTrack.bpm) * 100;
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200">
       <Header />
@@ -407,21 +413,36 @@ function App() {
                 </div>
 
                 <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
-                      <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
+                  <div className="flex flex-col gap-6">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
+                        <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Music size={24} className="text-gray-400" />
+                        <span className="text-sm text-gray-400">Original Key: {selectedTrack.camelotKey}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-8">
-                      <div>
-                        <span className="text-sm text-gray-400 mb-1 block">BPM</span>
-                        <div className="flex items-center gap-2">
+
+                    <div className="grid grid-cols-3 gap-8 p-6 bg-gray-800/50 rounded-lg">
+                      {/* BPM Control */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-300">BPM</span>
+                          {editedBpm !== null && (
+                            <span className="text-xs text-gray-400">
+                              Original: {Math.round(selectedTrack.bpm)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
                           <input
                             type="number"
                             value={editedBpm !== null ? editedBpm : Math.round(selectedTrack.bpm)}
                             onChange={(e) => handleBpmChange(e.target.value)}
                             className={`
-                              w-24 text-lg font-mono rounded px-2 py-1
+                              w-24 text-lg font-mono rounded px-3 py-2
                               ${editedBpm !== null 
                                 ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
                                 : 'bg-gray-800 border-gray-700 text-gray-200'
@@ -433,12 +454,17 @@ function App() {
                           />
                           {editedBpm !== null && (
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-500 font-mono">
-                                ({Math.round(selectedTrack.bpm)})
+                              <span className={`text-sm font-mono ${getBpmChangePercentage() > 0 ? 'text-success-400' : 'text-error-400'}`}>
+                                {getBpmChangePercentage() > 0 ? (
+                                  <ArrowUp size={14} className="inline mr-1" />
+                                ) : (
+                                  <ArrowDown size={14} className="inline mr-1" />
+                                )}
+                                {Math.abs(getBpmChangePercentage()).toFixed(1)}%
                               </span>
                               <button
                                 onClick={handleResetBpm}
-                                className="p-1.5 hover:bg-gray-800 rounded-full transition-colors group"
+                                className="p-1.5 hover:bg-gray-700 rounded-full transition-colors group"
                                 title="Reset to original BPM"
                               >
                                 <RotateCcw size={16} className="text-gray-400 group-hover:text-white" />
@@ -446,41 +472,60 @@ function App() {
                             </div>
                           )}
                         </div>
+                        <div className="text-xs text-gray-500">
+                          Safe range: ±8% ({Math.round(selectedTrack.bpm * 0.92)} - {Math.round(selectedTrack.bpm * 1.08)} BPM)
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-sm text-gray-400 mb-1 block">Key</span>
-                        <p className="text-lg">
-                          {transpose !== 0 ? getTransposedCamelotKey() : selectedTrack.camelotKey}
-                          {transpose !== 0 && (
-                            <span className="text-gray-500 ml-2">
-                              ({selectedTrack.camelotKey})
-                            </span>
-                          )}
-                        </p>
+
+                      {/* Key Display */}
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium text-gray-300">Current Key</span>
+                        <div className="h-[72px] flex items-center">
+                          <div className="text-2xl font-medium">
+                            {transpose !== 0 ? getTransposedCamelotKey() : selectedTrack.camelotKey}
+                            {transpose !== 0 && (
+                              <span className="text-base text-gray-500 ml-2">
+                                ({selectedTrack.camelotKey})
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-sm text-gray-400 mb-1 block">Transpose</span>
-                        <div className="flex items-center gap-2">
+
+                      {/* Transpose Control */}
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium text-gray-300">Transpose</span>
+                        <div className="flex items-center gap-3">
                           <select
                             value={transpose}
                             onChange={handleTransposeChange}
-                            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className={`
+                              px-3 py-2 text-lg rounded
+                              ${transpose !== 0
+                                ? 'bg-accent-900/30 border-accent-500 text-accent-200'
+                                : 'bg-gray-800 border-gray-700 text-gray-200'
+                              }
+                              border focus:outline-none focus:ring-2 focus:ring-accent-500
+                            `}
                           >
                             {Array.from({ length: 11 }, (_, i) => i - 5).map(value => (
                               <option key={value} value={value}>
-                                {value > 0 ? `+${value}` : value}
+                                {value > 0 ? `+${value}` : value} semitone{Math.abs(value) !== 1 ? 's' : ''}
                               </option>
                             ))}
                           </select>
                           {transpose !== 0 && (
                             <button
                               onClick={handleResetTranspose}
-                              className="p-1.5 hover:bg-gray-800 rounded-full transition-colors group"
+                              className="p-1.5 hover:bg-gray-700 rounded-full transition-colors group"
                               title="Reset transpose"
                             >
                               <RotateCcw size={16} className="text-gray-400 group-hover:text-white" />
                             </button>
                           )}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Shift the key up or down while maintaining harmonic compatibility
                         </div>
                       </div>
                     </div>

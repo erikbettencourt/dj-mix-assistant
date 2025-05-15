@@ -10,7 +10,6 @@ import Header from './components/Header';
 import FileUpload from './components/FileUpload';
 import SearchTrack from './components/SearchTrack';
 import CompatibilityResults from './components/CompatibilityResults';
-import TrackRecommendations from './components/TrackRecommendations';
 import TabNavigation from './components/TabNavigation';
 import SongAnalysis from './components/SongAnalysis';
 import { sampleTracks } from './utils/sampleData';
@@ -328,8 +327,6 @@ function App() {
                   tracks={compatibleTracks} 
                   onTrackSelect={handleCompatibleTrackSelect}
                 />
-
-                <TrackRecommendations referenceTrack={selectedTrack} />
               </div>
             ) : (
               <Navigate to="/" replace />

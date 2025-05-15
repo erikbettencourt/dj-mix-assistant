@@ -105,6 +105,9 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onT
           <tbody>
             {sortedTracks.map((track) => {
               const bpmChange = ((track.adjustedBpm - track.bpm) / track.bpm) * 100;
+              const formattedBpmChange = Number.isInteger(bpmChange) 
+                ? Math.abs(Math.round(bpmChange)) 
+                : Math.abs(bpmChange).toFixed(1);
               const compatibilityInfo = getCompatibilityLabel(track.compatibilityType);
               
               return (
@@ -122,11 +125,11 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onT
                   </td>
                   <td className="py-3 px-4 text-gray-300">{track.artist}</td>
                   <td className="py-3 px-4 text-right font-mono text-gray-300">
-                    {track.bpm.toFixed(1)}
+                    {Math.round(track.bpm)}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end space-x-2">
-                      <span className="font-mono text-gray-300">{track.adjustedBpm.toFixed(1)}</span>
+                      <span className="font-mono text-gray-300">{Math.round(track.adjustedBpm)}</span>
                       {Math.abs(bpmChange) > 0.1 && (
                         <span
                           className={`flex items-center text-xs ${
@@ -138,7 +141,7 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onT
                           ) : (
                             <ArrowDown size={12} className="mr-0.5" />
                           )}
-                          {Math.abs(bpmChange).toFixed(1)}%
+                          {formattedBpmChange}%
                         </span>
                       )}
                     </div>

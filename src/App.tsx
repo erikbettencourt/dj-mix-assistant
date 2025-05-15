@@ -4,7 +4,7 @@ import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot } from './utils/camelotLogic';
 import { findCompatibleTracks } from './utils/bpmCalculator';
-import { RotateCcw, Plus, Minus } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -21,7 +21,7 @@ function App() {
   const [compatibleTracks, setCompatibleTracks] = useState<CompatibleTrack[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [editedBpm, setEditedBpm] = useState<string | null>(null);
+  const [editedBpm, setEditedBpm] = useState<number | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | undefined>();
   const [selectedTrackHistory, setSelectedTrackHistory] = useState<CompatibleTrack[]>([]);
 
@@ -96,7 +96,7 @@ function App() {
     };
     
     setSelectedTrack(trackWithCamelot);
-    setEditedBpm(String(trackWithCamelot.bpm));
+    setEditedBpm(null);
     
     // Find compatible tracks
     const compatible = findCompatibleTracks(trackWithCamelot, tracks);
@@ -115,7 +115,7 @@ function App() {
       };
       
       setSelectedTrack(trackWithCamelot);
-      setEditedBpm(String(track.adjustedBpm));
+      setEditedBpm(track.adjustedBpm);
       
       // Find compatible tracks with the adjusted BPM and shifted key
       const modifiedTrack = {
@@ -137,49 +137,26 @@ function App() {
   const handleBpmChange = (value: string) => {
     if (!selectedTrack) return;
 
-    if (value === '') {
-      setEditedBpm(String(selectedTrack.bpm));
-      const compatible = findCompatibleTracks(selectedTrack, tracks);
-      setCompatibleTracks(compatible);
-      return;
-    }
+    const newBpm = Math.round(parseFloat(value));
+    if (isNaN(newBpm) || newBpm <= 0) return;
 
-    setEditedBpm(value);
+    setEditedBpm(newBpm);
     
-    // Only update compatible tracks if the value is a valid number
-    const newBpm = parseFloat(value);
-    if (!isNaN(newBpm) && newBpm > 0) {
-      // Create modified reference track with new BPM
-      const modifiedTrack = {
-        ...selectedTrack,
-        bpm: newBpm
-      };
+    // Create modified reference track with new BPM and potentially shifted key
+    const modifiedTrack = {
+      ...selectedTrack,
+      bpm: newBpm
+    };
 
-      // Recalculate compatible tracks with new BPM and shifted key
-      const compatible = findCompatibleTracks(modifiedTrack, tracks);
-      setCompatibleTracks(compatible);
-    } else {
-      setCompatibleTracks([]);
-    }
-  };
-
-  // Handle BPM increment/decrement
-  const handleBpmStep = (increment: boolean) => {
-    if (!selectedTrack || !editedBpm) return;
-
-    const currentBpm = parseFloat(editedBpm);
-    if (isNaN(currentBpm)) return;
-
-    const newBpm = increment ? currentBpm + 1 : currentBpm - 1;
-    if (newBpm > 0) {
-      handleBpmChange(String(newBpm));
-    }
+    // Recalculate compatible tracks with new BPM and shifted key
+    const compatible = findCompatibleTracks(modifiedTrack, tracks);
+    setCompatibleTracks(compatible);
   };
 
   // Reset BPM to original value
   const handleResetBpm = () => {
     if (!selectedTrack) return;
-    setEditedBpm(String(selectedTrack.bpm));
+    setEditedBpm(null);
     const compatible = findCompatibleTracks(selectedTrack, tracks);
     setCompatibleTracks(compatible);
   };
@@ -204,7 +181,7 @@ function App() {
       ...track,
       camelotKey: convertToCalemot(track.key)
     });
-    setEditedBpm(String(track.adjustedBpm));
+    setEditedBpm(track.adjustedBpm);
     
     const modifiedTrack = {
       ...track,
@@ -300,41 +277,25 @@ function App() {
                       <div>
                         <span className="text-sm text-gray-400 mb-1 block">BPM</span>
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            <button
-                              onClick={() => handleBpmStep(false)}
-                              className="p-1.5 hover:bg-gray-800 rounded-l text-gray-400 hover:text-white border border-r-0 border-gray-700"
-                              title="Decrease BPM"
-                            >
-                              <Minus size={16} />
-                            </button>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={editedBpm || ''}
-                              onChange={(e) => handleBpmChange(e.target.value)}
-                              className={`
-                                w-24 text-lg font-mono rounded-none px-2 py-1
-                                ${editedBpm !== String(selectedTrack.bpm)
-                                  ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
-                                  : 'bg-gray-800 border-gray-700 text-gray-200'
-                                }
-                                border-y focus:outline-none focus:ring-2 focus:ring-primary-500
-                              `}
-                            />
-                            <button
-                              onClick={() => handleBpmStep(true)}
-                              className="p-1.5 hover:bg-gray-800 rounded-r text-gray-400 hover:text-white border border-l-0 border-gray-700"
-                              title="Increase BPM"
-                            >
-                              <Plus size={16} />
-                            </button>
-                          </div>
-                          {editedBpm !== String(selectedTrack.bpm) && (
+                          <input
+                            type="number"
+                            value={editedBpm !== null ? editedBpm : Math.round(selectedTrack.bpm)}
+                            onChange={(e) => handleBpmChange(e.target.value)}
+                            className={`
+                              w-24 text-lg font-mono rounded px-2 py-1
+                              ${editedBpm !== null 
+                                ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
+                                : 'bg-gray-800 border-gray-700 text-gray-200'
+                              }
+                              border focus:outline-none focus:ring-2 focus:ring-primary-500
+                            `}
+                            min="1"
+                            step="1"
+                          />
+                          {editedBpm !== null && (
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-gray-500 font-mono">
-                                ({selectedTrack.bpm})
+                                ({Math.round(selectedTrack.bpm)})
                               </span>
                               <button
                                 onClick={handleResetBpm}

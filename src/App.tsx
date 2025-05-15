@@ -45,28 +45,35 @@ function App() {
       setSelectedTrackHistory([]);
     } else {
       const trackId = location.pathname.split('/').pop();
-      if (trackId && selectedTrackHistory.length > 0) {
-        const historyIndex = selectedTrackHistory.findIndex(t => t.id === trackId);
-        if (historyIndex !== -1) {
+      if (trackId) {
+        // First, check if the track is in history
+        const historyTrack = selectedTrackHistory.find(t => t.id === trackId);
+        if (historyTrack) {
+          const historyIndex = selectedTrackHistory.findIndex(t => t.id === trackId);
           const newHistory = selectedTrackHistory.slice(0, historyIndex + 1);
-          const track = selectedTrackHistory[historyIndex];
           
           setSelectedTrack({
-            ...track,
-            camelotKey: convertToCalemot(track.key)
+            ...historyTrack,
+            camelotKey: convertToCalemot(historyTrack.key)
           });
-          setEditedBpm(track.adjustedBpm);
+          setEditedBpm(historyTrack.adjustedBpm);
           
           const modifiedTrack = {
-            ...track,
-            bpm: track.adjustedBpm,
-            key: track.shiftedKey,
-            camelotKey: track.shiftedCamelotKey
+            ...historyTrack,
+            bpm: historyTrack.adjustedBpm,
+            key: historyTrack.shiftedKey,
+            camelotKey: historyTrack.shiftedCamelotKey
           };
           
           const compatible = findCompatibleTracks(modifiedTrack, tracks);
           setCompatibleTracks(compatible);
           setSelectedTrackHistory(newHistory);
+        } else {
+          // If not in history, check if it's a new track selection
+          const track = tracks.find(t => t.id === trackId);
+          if (track) {
+            handleTrackSelect(track);
+          }
         }
       }
     }
@@ -148,7 +155,19 @@ function App() {
     // Find compatible tracks
     const compatible = findCompatibleTracks(trackWithCamelot, tracks);
     setCompatibleTracks(compatible);
-    setSelectedTrackHistory([trackWithCamelot as CompatibleTrack]);
+    
+    // Create a compatible track object for history
+    const historyTrack: CompatibleTrack = {
+      ...trackWithCamelot,
+      originalKey: track.key,
+      adjustedBpm: track.bpm,
+      shiftedKey: track.key,
+      shiftedCamelotKey: trackWithCamelot.camelotKey || '',
+      compatibilityType: 'exact',
+      compatibilityScore: 100
+    };
+    
+    setSelectedTrackHistory([historyTrack]);
     navigate(`/track/${track.id}`);
   };
 

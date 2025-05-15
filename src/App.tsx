@@ -4,7 +4,7 @@ import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot, calculateKeyShift, getCamelotKeyInfo } from './utils/camelotLogic';
 import { findCompatibleTracks } from './utils/bpmCalculator';
-import { RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 import Header from './components/Header';
 import FileUpload from './components/FileUpload';
@@ -225,9 +225,10 @@ function App() {
   };
 
   // Handle transpose change
-  const handleTransposeChange = (newTranspose: number) => {
-    if (!selectedTrack || newTranspose < -3 || newTranspose > 3) return;
+  const handleTransposeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!selectedTrack) return;
 
+    const newTranspose = parseInt(event.target.value, 10);
     setTranspose(newTranspose);
     
     const keyInfo = getCamelotKeyInfo(selectedTrack.key);
@@ -313,6 +314,25 @@ function App() {
     setCompatibleTracks(compatible);
     setSelectedTrackHistory(newHistory);
     navigate(`/track/${track.id}`);
+  };
+
+  // Calculate transposed Camelot key
+  const getTransposedCamelotKey = () => {
+    if (!selectedTrack || !selectedTrack.camelotKey) return null;
+    
+    const keyInfo = getCamelotKeyInfo(selectedTrack.key);
+    if (!keyInfo) return null;
+
+    let newNumber = keyInfo.number;
+    for (let i = 0; i < Math.abs(transpose); i++) {
+      if (transpose > 0) {
+        newNumber = newNumber === 12 ? 1 : newNumber + 1;
+      } else {
+        newNumber = newNumber === 1 ? 12 : newNumber - 1;
+      }
+    }
+
+    return `${newNumber}${keyInfo.letter}`;
   };
 
   return (
@@ -430,11 +450,8 @@ function App() {
                       <div>
                         <span className="text-sm text-gray-400 mb-1 block">Key</span>
                         <p className="text-lg">
-                          {editedBpm !== null && compatibleTracks.length > 0
-                            ? compatibleTracks[0].shiftedCamelotKey
-                            : selectedTrack.camelotKey}
-                          {editedBpm !== null && compatibleTracks.length > 0 && 
-                           compatibleTracks[0].shiftedCamelotKey !== selectedTrack.camelotKey && (
+                          {transpose !== 0 ? getTransposedCamelotKey() : selectedTrack.camelotKey}
+                          {transpose !== 0 && (
                             <span className="text-gray-500 ml-2">
                               ({selectedTrack.camelotKey})
                             </span>
@@ -444,31 +461,17 @@ function App() {
                       <div>
                         <span className="text-sm text-gray-400 mb-1 block">Transpose</span>
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            <button
-                              onClick={() => handleTransposeChange(transpose - 1)}
-                              disabled={transpose <= -3}
-                              className="p-1.5 hover:bg-gray-800 rounded-l-md disabled:opacity-50 disabled:hover:bg-transparent"
-                            >
-                              <ChevronDown size={16} className="text-gray-400" />
-                            </button>
-                            <span className={`
-                              w-8 text-center font-mono
-                              ${transpose !== 0 
-                                ? 'text-primary-400' 
-                                : 'text-gray-200'
-                              }
-                            `}>
-                              {transpose > 0 ? `+${transpose}` : transpose}
-                            </span>
-                            <button
-                              onClick={() => handleTransposeChange(transpose + 1)}
-                              disabled={transpose >= 3}
-                              className="p-1.5 hover:bg-gray-800 rounded-r-md disabled:opacity-50 disabled:hover:bg-transparent"
-                            >
-                              <ChevronUp size={16} className="text-gray-400" />
-                            </button>
-                          </div>
+                          <select
+                            value={transpose}
+                            onChange={handleTransposeChange}
+                            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          >
+                            {Array.from({ length: 11 }, (_, i) => i - 5).map(value => (
+                              <option key={value} value={value}>
+                                {value > 0 ? `+${value}` : value}
+                              </option>
+                            ))}
+                          </select>
                           {transpose !== 0 && (
                             <button
                               onClick={handleResetTranspose}

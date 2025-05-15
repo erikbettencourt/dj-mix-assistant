@@ -12,6 +12,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization'
 };
 
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,30 +25,29 @@ Deno.serve(async (req) => {
   try {
     const { key, bpm, genre } = await req.json() as RecommendationRequest;
 
-    // Simulate API call to music service
-    // In production, this would call real music APIs
-    const recommendations = [
-      {
-        id: '1',
-        title: 'Summer Nights',
-        artist: 'DJ Example',
-        bpm: bpm + 2,
-        key: key,
-        price: 1.99,
-        purchaseUrl: 'https://example.com/track/1',
-        previewUrl: 'https://example.com/preview/1'
-      },
-      {
-        id: '2',
-        title: 'Dancing in the Dark',
-        artist: 'Producer Demo',
-        bpm: bpm - 1,
-        key: key,
-        price: 2.99,
-        purchaseUrl: 'https://example.com/track/2',
-        previewUrl: 'https://example.com/preview/2'
-      }
-    ];
+    // Find tracks with similar BPM (within ±8%) and matching key
+    const bpmRange = {
+      min: bpm * 0.92, // -8%
+      max: bpm * 1.08, // +8%
+    };
+
+    let query = supabase
+      .from('tracks')
+      .select('*')
+      .gte('bpm', bpmRange.min)
+      .lte('bpm', bpmRange.max)
+      .eq('key', key)
+      .limit(6);
+
+    if (genre) {
+      query = query.eq('genre', genre);
+    }
+
+    const { data: recommendations, error } = await query;
+
+    if (error) {
+      throw error;
+    }
 
     return new Response(JSON.stringify(recommendations), {
       headers: {

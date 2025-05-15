@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Track } from '../types';
-import { Music, ExternalLink, Play, Pause } from 'lucide-react';
+import { Music, ExternalLink, Play, Pause, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface RecommendedTrack {
@@ -10,8 +10,9 @@ interface RecommendedTrack {
   bpm: number;
   key: string;
   price?: number;
-  purchaseUrl?: string;
-  previewUrl?: string;
+  purchase_url?: string;
+  preview_url?: string;
+  genre?: string;
 }
 
 interface TrackRecommendationsProps {
@@ -23,6 +24,7 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
@@ -59,22 +61,45 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
     if (referenceTrack) {
       fetchRecommendations();
     }
+
+    // Cleanup audio on unmount
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.src = '';
+      }
+    };
   }, [referenceTrack]);
 
-  const togglePlay = (trackId: string) => {
-    setPlayingTrackId(playingTrackId === trackId ? null : trackId);
+  const togglePlay = (track: RecommendedTrack) => {
+    if (!track.preview_url) return;
+
+    if (playingTrackId === track.id) {
+      audio?.pause();
+      setPlayingTrackId(null);
+      return;
+    }
+
+    if (audio) {
+      audio.pause();
+    }
+
+    const newAudio = new Audio(track.preview_url);
+    newAudio.play();
+    setAudio(newAudio);
+    setPlayingTrackId(track.id);
+
+    newAudio.onended = () => {
+      setPlayingTrackId(null);
+    };
   };
 
   if (loading) {
     return (
-      <div className="mt-8 p-6 bg-gray-900 rounded-lg text-center">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-800 rounded w-1/4 mx-auto"></div>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="bg-gray-800 rounded-lg p-4 h-48"></div>
-            ))}
-          </div>
+      <div className="mt-8 p-6 bg-gray-900 rounded-lg">
+        <div className="flex items-center justify-center space-x-2">
+          <Loader2 className="animate-spin" />
+          <span>Loading recommendations...</span>
         </div>
       </div>
     );
@@ -84,6 +109,15 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
     return (
       <div className="mt-8 p-6 bg-gray-900 rounded-lg text-center text-error-400">
         {error}
+      </div>
+    );
+  }
+
+  if (recommendations.length === 0) {
+    return (
+      <div className="mt-8 p-6 bg-gray-900 rounded-lg text-center">
+        <Music className="mx-auto h-12 w-12 text-gray-600 mb-3" />
+        <p className="text-gray-400">No recommendations found for this track</p>
       </div>
     );
   }
@@ -109,9 +143,9 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
                 <h4 className="font-medium text-white">{track.title}</h4>
                 <p className="text-gray-400">{track.artist}</p>
               </div>
-              {track.previewUrl && (
+              {track.preview_url && (
                 <button
-                  onClick={() => togglePlay(track.id)}
+                  onClick={() => togglePlay(track)}
                   className="p-2 hover:bg-gray-700 rounded-full transition-colors"
                 >
                   {playingTrackId === track.id ? (
@@ -123,9 +157,15 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
               )}
             </div>
             
-            <div className="mt-3 flex items-center gap-4 text-sm text-gray-400">
-              <span>{track.bpm} BPM</span>
-              <span>{track.key}</span>
+            <div className="mt-3 flex items-center gap-4 text-sm">
+              <span className="text-gray-400">{Math.round(track.bpm)} BPM</span>
+              <span className="text-gray-400">{track.key}</span>
+              {track.genre && (
+                <>
+                  <span className="text-gray-600">•</span>
+                  <span className="text-gray-400">{track.genre}</span>
+                </>
+              )}
             </div>
 
             <div className="mt-4 flex items-center justify-between">
@@ -134,9 +174,9 @@ const TrackRecommendations: React.FC<TrackRecommendationsProps> = ({ referenceTr
                   ${track.price.toFixed(2)}
                 </span>
               )}
-              {track.purchaseUrl && (
+              {track.purchase_url && (
                 <a
-                  href={track.purchaseUrl}
+                  href={track.purchase_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"

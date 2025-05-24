@@ -14,15 +14,7 @@ export interface CompatibleTrack extends Track {
   shiftedCamelotKey: string;
   compatibilityType: CompatibilityType;
   compatibilityScore: number;
-  compatibilityReason: string;
-  semitoneShift: number;
-  matchType: MatchType;
 }
-
-export type MatchType = 
-  | 'native'
-  | 'pitch-shift'
-  | 'tempo-match';
 
 export type CompatibilityType = 
   | 'exact'
@@ -43,4 +35,4 @@ export interface CamelotKeyInfo {
   type: 'major' | 'minor';
 }
 
-export type FilterOption = 'all' | 'native' | 'pitch-shift' | 'tempo-match';
+export type FilterOption = 'all' | 'exact' | 'energy-change' | 'compatible' | 'relatives';

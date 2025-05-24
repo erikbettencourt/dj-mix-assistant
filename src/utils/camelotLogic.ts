@@ -120,53 +120,36 @@ export const getCamelotKeyInfo = (key: string): CamelotKeyInfo | null => {
   return musicalToCamelot[camelotKey] || null;
 };
 
-// Calculate key shift based on BPM change
-export const calculateKeyShift = (originalKey: string, originalBpm: number, targetBpm: number): string => {
-  if (originalKey === 'Unknown' || !originalBpm || !targetBpm) {
-    return originalKey;
+// Calculate key shift based on semitone change
+export const calculateKeyShift = (key: string, semitoneShift: number): string => {
+  if (key === 'Unknown' || semitoneShift === 0) {
+    return key;
   }
-  
-  // Calculate semitone shift based on BPM ratio
-  // When we change tempo by 6%, the pitch shifts by 1 semitone
-  const percentChange = (targetBpm - originalBpm) / originalBpm;
-  const semitoneShift = Math.round(percentChange * 100 / 6);
-  
-  // If no shift, return the original key
-  if (semitoneShift === 0) {
-    return originalKey;
-  }
-  
-  // Get the original key info
-  const keyInfo = getCamelotKeyInfo(originalKey);
+
+  const keyInfo = getCamelotKeyInfo(key);
   if (!keyInfo) {
-    return originalKey;
+    return key;
   }
-  
-  // Apply the semitone shift in the Camelot system
-  // Each semitone up is +7 in the Camelot wheel
+
+  // Calculate new position in Camelot wheel
   let newNumber = keyInfo.number;
-  
-  // Calculate the shift in the Camelot system
+  const direction = semitoneShift > 0 ? 1 : -1;
+
+  // Each semitone is equivalent to moving 7 steps in the Camelot wheel
   for (let i = 0; i < Math.abs(semitoneShift); i++) {
-    if (semitoneShift > 0) {
-      // Moving up by a semitone
-      newNumber = (newNumber + 7) > 12 ? (newNumber + 7) - 12 : newNumber + 7;
-    } else {
-      // Moving down by a semitone
-      newNumber = (newNumber - 7) <= 0 ? (newNumber - 7) + 12 : newNumber - 7;
-    }
+    newNumber = ((newNumber + (direction * 7) - 1 + 12) % 12) + 1;
   }
-  
+
   const newCamelotKey = `${newNumber}${keyInfo.letter}`;
-  
-  // Find the matching musical key for this Camelot key
+
+  // Find the matching musical key
   for (const [key, info] of Object.entries(musicalToCamelot)) {
     if (info.camelotKey === newCamelotKey) {
       return key;
     }
   }
-  
-  return originalKey; // Fallback
+
+  return key;
 };
 
 // Helper function to normalize Camelot number
@@ -180,86 +163,35 @@ const normalizeCamelotNumber = (num: number): number => {
 export const determineCompatibility = (
   referenceKey: string,
   trackKey: string
-): { type: CompatibilityType; score: number } => {
+) => {
   if (referenceKey === 'Unknown' || trackKey === 'Unknown') {
-    return { type: 'incompatible', score: 0 };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
   }
-  
+
   const refInfo = getCamelotKeyInfo(referenceKey);
   const trackInfo = getCamelotKeyInfo(trackKey);
-  
+
   if (!refInfo || !trackInfo) {
-    return { type: 'incompatible', score: 0 };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
   }
-  
-  // 1. Exact match - same key
+
+  // Exact match
   if (refInfo.camelotKey === trackInfo.camelotKey) {
-    return { type: 'exact', score: 100 };
+    return { type: 'exact' as CompatibilityType, description: 'Perfect Match', score: 100 };
   }
-  
-  // 2. Same number, different letter (relative major/minor)
+
+  // Adjacent keys (perfect fifth/fourth)
+  if (refInfo.letter === trackInfo.letter) {
+    const diff = Math.abs(refInfo.number - trackInfo.number);
+    if (diff === 1 || diff === 11) {
+      return { type: 'adjacent' as CompatibilityType, description: 'Perfect Fifth/Fourth', score: 90 };
+    }
+  }
+
+  // Relative major/minor
   if (refInfo.number === trackInfo.number && refInfo.letter !== trackInfo.letter) {
-    return refInfo.letter === 'A' 
-      ? { type: 'relative-major', score: 95 }
-      : { type: 'relative-minor', score: 95 };
+    return { type: 'relative' as CompatibilityType, description: 'Relative Major/Minor', score: 85 };
   }
-  
-  // 3. Move by 1 around the wheel (perfect fourth/fifth)
-  const isOneStep = 
-    Math.abs(refInfo.number - trackInfo.number) === 1 || 
-    (refInfo.number === 12 && trackInfo.number === 1) ||
-    (refInfo.number === 1 && trackInfo.number === 12);
-  
-  if (isOneStep && refInfo.letter === trackInfo.letter) {
-    const isClockwise = 
-      (trackInfo.number > refInfo.number && !(refInfo.number === 1 && trackInfo.number === 12)) ||
-      (refInfo.number === 12 && trackInfo.number === 1);
-    
-    return isClockwise
-      ? { type: 'perfect-fifth', score: 90 }
-      : { type: 'perfect-fourth', score: 90 };
-  }
-  
-  // 4. Move by 2 around the wheel
-  const isTwoSteps = 
-    Math.abs(refInfo.number - trackInfo.number) === 2 &&
-    refInfo.letter === trackInfo.letter;
-  
-  if (isTwoSteps) {
-    return { type: 'compatible', score: 85 };
-  }
-  
-  // 5. Diagonal moves (energy changes)
-  const isDiagonal = isOneStep && refInfo.letter !== trackInfo.letter;
-  if (isDiagonal) {
-    const isEnergyBoost = 
-      (refInfo.letter === 'A' && trackInfo.letter === 'B') ||
-      (refInfo.letter === 'B' && trackInfo.number > trackInfo.number);
-    
-    return isEnergyBoost
-      ? { type: 'energy-boost', score: 80 }
-      : { type: 'energy-drop', score: 80 };
-  }
-  
-  // 6. Major to Minor key jump (switch letters and -3)
-  const majorToMinorJump = 
-    refInfo.letter !== trackInfo.letter &&
-    normalizeCamelotNumber(refInfo.number - 3) === trackInfo.number;
-  
-  if (majorToMinorJump) {
-    return { type: 'compatible', score: 75 };
-  }
-  
-  // 7. Flat to Minor shift (+4 when in major)
-  const flatToMinorShift =
-    refInfo.letter === 'B' &&
-    trackInfo.letter === 'A' &&
-    normalizeCamelotNumber(refInfo.number + 4) === trackInfo.number;
-  
-  if (flatToMinorShift) {
-    return { type: 'compatible', score: 70 };
-  }
-  
-  // Not compatible
-  return { type: 'incompatible', score: 0 };
+
+  return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
 };

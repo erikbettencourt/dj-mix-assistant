@@ -8,8 +8,8 @@ interface CompatibilityResultsProps {
   onTrackSelect?: (track: CompatibleTrack) => void;
 }
 
-const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups, onTrackSelect }) => {
-  if (groups.length === 0) {
+const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = [], onTrackSelect }) => {
+  if (!groups || groups.length === 0) {
     return (
       <motion.div
         className="my-8 p-6 bg-gray-900 rounded-lg border border-gray-800 text-center"

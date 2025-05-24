@@ -3,7 +3,7 @@ import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-do
 import { Track, CompatibleTrack } from './types';
 import { parseXmlFile } from './utils/xmlParser';
 import { convertToCalemot } from './utils/camelotLogic';
-import { findCompatibleTracks } from './utils/bpmCalculator';
+import { findCompatibleTracks, groupCompatibleTracks } from './utils/bpmCalculator';
 import { RotateCcw } from 'lucide-react';
 
 import Header from './components/Header';
@@ -324,7 +324,7 @@ function App() {
                 </div>
                 
                 <CompatibilityResults 
-                  tracks={compatibleTracks} 
+                  groups={groupCompatibleTracks(compatibleTracks)}
                   onTrackSelect={handleCompatibleTrackSelect}
                 />
               </div>

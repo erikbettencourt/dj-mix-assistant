@@ -3,6 +3,7 @@ import { calculateKeyShift, convertToCalemot, determineCompatibility, shiftKeyBy
 
 const MAX_SEMITONE_SHIFT = 3;
 const BPM_SEMITONE_RATIO = 0.06; // 6% BPM change = 1 semitone
+const MAX_BPM_CHANGE = 0.08; // 8% maximum BPM change
 
 export const findCompatibleTracks = (
   referenceTrack: Track,
@@ -25,6 +26,7 @@ export const findCompatibleTracks = (
           ...nativeCompatibility,
           matchType: 'native'
         });
+        return; // Skip other checks if natively compatible
       }
       
       // Check pitch shift compatibility (±1-3 semitones)
@@ -34,6 +36,7 @@ export const findCompatibleTracks = (
           ...pitchShiftCompatibility,
           matchType: 'pitch-shift'
         });
+        return; // Skip tempo match if pitch shift compatible
       }
       
       // Check tempo-match compatibility (no pitch lock)
@@ -74,6 +77,9 @@ const checkNativeCompatibility = (
   if (compatibilityType === 'perfect-fourth') compatibilityReason = 'Perfect Fourth (-1)';
   if (compatibilityType === 'relative-minor') compatibilityReason = 'Relative Minor';
   if (compatibilityType === 'relative-major') compatibilityReason = 'Relative Major';
+  if (compatibilityType === 'energy-boost') compatibilityReason = 'Energy Boost';
+  if (compatibilityType === 'energy-drop') compatibilityReason = 'Energy Drop';
+  if (compatibilityType === 'compatible') compatibilityReason = 'Compatible';
   
   return {
     ...track,
@@ -93,6 +99,9 @@ const checkPitchShiftCompatibility = (
   track: Track,
   refCamelotKey: string
 ): CompatibleTrack | null => {
+  let bestMatch: CompatibleTrack | null = null;
+  let bestScore = 0;
+  
   for (let semitones = -MAX_SEMITONE_SHIFT; semitones <= MAX_SEMITONE_SHIFT; semitones++) {
     if (semitones === 0) continue; // Skip no shift as it's covered by native compatibility
     
@@ -102,8 +111,9 @@ const checkPitchShiftCompatibility = (
     const { type: compatibilityType, score: compatibilityScore } = 
       determineCompatibility(refCamelotKey, shiftedCamelotKey);
     
-    if (compatibilityType !== 'incompatible') {
-      return {
+    if (compatibilityType !== 'incompatible' && compatibilityScore > bestScore) {
+      bestScore = compatibilityScore;
+      bestMatch = {
         ...track,
         originalKey: track.key,
         adjustedBpm: track.bpm,
@@ -118,16 +128,25 @@ const checkPitchShiftCompatibility = (
     }
   }
   
-  return null;
+  return bestMatch;
 };
 
 const checkTempoMatchCompatibility = (
   track: Track,
   referenceTrack: Track
 ): CompatibleTrack | null => {
-  const bpmRatio = referenceTrack.bpm / track.bpm;
-  const semitoneShift = Math.round(Math.log2(bpmRatio) * 12);
+  // Calculate BPM change percentage
+  const bpmChange = (referenceTrack.bpm - track.bpm) / track.bpm;
   
+  // If BPM change is too large, skip
+  if (Math.abs(bpmChange) > MAX_BPM_CHANGE) {
+    return null;
+  }
+  
+  // Calculate semitone shift based on BPM change
+  const semitoneShift = Math.round(bpmChange / BPM_SEMITONE_RATIO);
+  
+  // If shift is too large, skip
   if (Math.abs(semitoneShift) > MAX_SEMITONE_SHIFT) {
     return null;
   }
@@ -139,7 +158,7 @@ const checkTempoMatchCompatibility = (
     determineCompatibility(referenceTrack.camelotKey || '', shiftedCamelotKey);
   
   if (compatibilityType !== 'incompatible') {
-    const bpmChange = ((referenceTrack.bpm - track.bpm) / track.bpm * 100).toFixed(1);
+    const bpmChangePercent = (bpmChange * 100).toFixed(1);
     
     return {
       ...track,
@@ -149,7 +168,7 @@ const checkTempoMatchCompatibility = (
       shiftedCamelotKey,
       compatibilityType,
       compatibilityScore: compatibilityScore * 0.8, // Larger penalty for tempo matching
-      compatibilityReason: `BPM Match (${bpmChange}%, ${semitoneShift > 0 ? '+' : ''}${semitoneShift} semitones)`,
+      compatibilityReason: `BPM Match (${bpmChangePercent}%, ${semitoneShift > 0 ? '+' : ''}${semitoneShift} semitones)`,
       semitoneShift,
       matchType: 'tempo-match'
     };

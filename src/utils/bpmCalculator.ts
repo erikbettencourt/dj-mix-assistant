@@ -1,4 +1,4 @@
-import { Track, CompatibleTrack, CompatibilityType, CompatibilityDetails } from '../types';
+import { Track, CompatibleTrack, CompatibilityType, CompatibilityDetails, CompatibilityGroup } from '../types';
 import { calculateKeyShift, convertToCalemot, getCamelotKeyInfo, determineCompatibility } from './camelotLogic';
 
 const MAX_SEMITONE_SHIFT = 3;
@@ -20,23 +20,25 @@ export const findCompatibleTracks = (
 
   return allTracks
     .filter(track => track.id !== referenceTrack.id)
-    .map(track => {
+    .flatMap(track => {
       const originalBpm = track.bpm;
       const trackCamelotKey = track.camelotKey || convertToCalemot(track.key);
       const trackKeyInfo = getCamelotKeyInfo(track.key);
 
-      if (!trackKeyInfo) return null;
+      if (!trackKeyInfo) return [];
+
+      const compatibleTracks: CompatibleTrack[] = [];
 
       // Check native compatibility first
       const nativeCompatibility = determineCompatibility(refCamelotKey, trackCamelotKey);
       if (nativeCompatibility.type !== 'incompatible') {
-        return createCompatibleTrack(track, {
+        compatibleTracks.push(createCompatibleTrack(track, {
           type: nativeCompatibility.type,
           semitoneShift: 0,
           bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
           description: nativeCompatibility.description,
           score: nativeCompatibility.score
-        }, referenceTrack.bpm);
+        }, referenceTrack.bpm));
       }
 
       // Try pitch shifting within limits
@@ -45,26 +47,26 @@ export const findCompatibleTracks = (
         const shiftedUpKey = calculateKeyShift(track.key, shift);
         const upCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedUpKey));
         if (upCompatibility.type !== 'incompatible') {
-          return createCompatibleTrack(track, {
+          compatibleTracks.push(createCompatibleTrack(track, {
             type: 'pitch-shift-up',
             semitoneShift: shift,
             bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
             description: `Shift up ${shift} semitone${shift > 1 ? 's' : ''} for ${upCompatibility.description}`,
             score: upCompatibility.score * 0.9 // Slight penalty for pitch shifting
-          }, referenceTrack.bpm);
+          }, referenceTrack.bpm));
         }
 
         // Try shifting down
         const shiftedDownKey = calculateKeyShift(track.key, -shift);
         const downCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedDownKey));
         if (downCompatibility.type !== 'incompatible') {
-          return createCompatibleTrack(track, {
+          compatibleTracks.push(createCompatibleTrack(track, {
             type: 'pitch-shift-down',
             semitoneShift: -shift,
             bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
             description: `Shift down ${shift} semitone${shift > 1 ? 's' : ''} for ${downCompatibility.description}`,
             score: downCompatibility.score * 0.9
-          }, referenceTrack.bpm);
+          }, referenceTrack.bpm));
         }
       }
 
@@ -76,19 +78,18 @@ export const findCompatibleTracks = (
         const bpmMatchCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedKey));
         
         if (bpmMatchCompatibility.type !== 'incompatible') {
-          return createCompatibleTrack(track, {
+          compatibleTracks.push(createCompatibleTrack(track, {
             type: 'bpm-match',
             semitoneShift,
             bpmAdjustment: bpmChangePercent,
             description: `Match BPM (${semitoneShift > 0 ? '+' : ''}${semitoneShift} semitone shift)`,
             score: bpmMatchCompatibility.score * 0.8 // Larger penalty for BPM matching
-          }, referenceTrack.bpm);
+          }, referenceTrack.bpm));
         }
       }
 
-      return null;
+      return compatibleTracks;
     })
-    .filter((track): track is CompatibleTrack => track !== null)
     .sort((a, b) => b.compatibility.score - a.compatibility.score);
 };
 

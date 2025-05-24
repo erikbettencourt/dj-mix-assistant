@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, Shuffle, HelpCircle } from 'lucide-react';
-import { CompatibleTrack } from '../types';
+import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, HelpCircle, Music, Sliders, Clock } from 'lucide-react';
+import { CompatibleTrack, MatchType } from '../types';
 import { motion } from 'framer-motion';
 
 interface CompatibilityResultsProps {
@@ -8,41 +8,39 @@ interface CompatibilityResultsProps {
   onTrackSelect?: (track: CompatibleTrack) => void;
 }
 
-type SortType = 'bpm-change' | 'compatibility';
-
 const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onTrackSelect }) => {
-  const [sortType, setSortType] = useState<SortType>('bpm-change');
+  const [matchType, setMatchType] = useState<MatchType | 'all'>('all');
 
-  const sortedTracks = [...tracks].sort((a, b) => {
-    if (sortType === 'bpm-change') {
-      const changeA = Math.abs(a.adjustedBpm - a.bpm);
-      const changeB = Math.abs(b.adjustedBpm - b.bpm);
-      return changeA - changeB;
-    } else {
-      return b.compatibilityScore - a.compatibilityScore;
+  const filteredTracks = matchType === 'all' 
+    ? tracks 
+    : tracks.filter(track => track.matchType === matchType);
+
+  const groupedTracks = filteredTracks.reduce((acc, track) => {
+    const group = track.matchType;
+    if (!acc[group]) {
+      acc[group] = [];
     }
-  });
+    acc[group].push(track);
+    return acc;
+  }, {} as Record<MatchType, CompatibleTrack[]>);
 
-  const getCompatibilityLabel = (type: string) => {
+  const getMatchTypeLabel = (type: MatchType): { icon: React.ReactNode; text: string } => {
     switch (type) {
-      case 'exact':
-        return { text: 'Exact Match', color: 'bg-success-500' };
-      case 'perfect-fifth':
-        return { text: 'Perfect Fifth (+1)', color: 'bg-success-600' };
-      case 'perfect-fourth':
-        return { text: 'Perfect Fourth (-1)', color: 'bg-success-700' };
-      case 'relative-minor':
-        return { text: 'Relative Minor', color: 'bg-accent-500' };
-      case 'relative-major':
-        return { text: 'Relative Major', color: 'bg-accent-600' };
-      case 'energy-boost':
-        return { text: 'Energy Boost', color: 'bg-secondary-500' };
-      case 'energy-drop':
-        return { text: 'Energy Drop', color: 'bg-secondary-600' };
-      case 'compatible':
-        return { text: 'Compatible', color: 'bg-primary-600' };
-      default:
-        return { text: 'Incompatible', color: 'bg-gray-600' };
+      case 'native':
+        return { 
+          icon: <Music size={16} className="text-success-400" />,
+          text: 'Native Compatibility'
+        };
+      case 'pitch-shift':
+        return { 
+          icon: <Sliders size={16} className="text-accent-400" />,
+          text: 'Pitch Shifted'
+        };
+      case 'tempo-match':
+        return { 
+          icon: <Clock size={16} className="text-primary-400" />,
+          text: 'Tempo Matched'
+        };
     }
   };
 
@@ -76,14 +74,16 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onT
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">Sort by:</span>
+            <span className="text-sm text-gray-400">Filter by:</span>
             <select
-              value={sortType}
-              onChange={(e) => setSortType(e.target.value as SortType)}
+              value={matchType}
+              onChange={(e) => setMatchType(e.target.value as MatchType | 'all')}
               className="bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="bpm-change">BPM Change</option>
-              <option value="compatibility">Compatibility</option>
+              <option value="all">All Matches</option>
+              <option value="native">Native Compatibility</option>
+              <option value="pitch-shift">Pitch Shifted</option>
+              <option value="tempo-match">Tempo Matched</option>
             </select>
           </div>
         </div>
@@ -103,80 +103,93 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ tracks, onT
             </tr>
           </thead>
           <tbody>
-            {sortedTracks.map((track) => {
-              const bpmChange = Math.round(((track.adjustedBpm - track.bpm) / track.bpm) * 100);
-              const compatibilityInfo = getCompatibilityLabel(track.compatibilityType);
-              
-              return (
-                <tr
-                  key={track.id}
-                  className="border-t border-gray-800 hover:bg-gray-800/50 transition-colors duration-150"
-                >
-                  <td className="py-3 px-4">
-                    <button
-                      onClick={() => onTrackSelect?.(track)}
-                      className="text-white hover:text-primary-400 text-left transition-colors duration-200"
-                    >
-                      {track.title}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">{track.artist}</td>
-                  <td className="py-3 px-4 text-right font-mono text-gray-300">
-                    {Math.round(track.bpm)}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <span className="font-mono text-gray-300">{Math.round(track.adjustedBpm)}</span>
-                      {Math.abs(bpmChange) > 0 && (
-                        <span
-                          className={`flex items-center text-xs ${
-                            bpmChange > 0 ? 'text-success-400' : 'text-error-400'
-                          }`}
-                        >
-                          {bpmChange > 0 ? (
-                            <ArrowUp size={12} className="mr-0.5" />
-                          ) : (
-                            <ArrowDown size={12} className="mr-0.5" />
-                          )}
-                          {Math.abs(bpmChange)}%
-                        </span>
-                      )}
+            {Object.entries(groupedTracks).map(([type, tracks]) => (
+              <React.Fragment key={type}>
+                <tr className="bg-gray-800/30">
+                  <td colSpan={7} className="py-2 px-4">
+                    <div className="flex items-center gap-2">
+                      {getMatchTypeLabel(type as MatchType).icon}
+                      <span className="font-medium text-gray-300">
+                        {getMatchTypeLabel(type as MatchType).text}
+                      </span>
+                      <span className="text-gray-500 text-sm">
+                        ({tracks.length} tracks)
+                      </span>
                     </div>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
-                      {track.originalKey}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center">
-                      {track.originalKey !== track.shiftedKey ? (
-                        <div className="flex items-center space-x-1">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-accent-800/50 border border-accent-700/50 text-accent-200">
-                            {track.shiftedCamelotKey}
-                          </span>
-                          <Shuffle size={14} className="text-gray-500" title="Key shifted to match BPM" />
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
-                          {track.shiftedCamelotKey}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span
-                      className={`
-                        inline-block px-3 py-1 rounded-full text-xs font-medium text-white
-                        ${compatibilityInfo.color}
-                      `}
-                    >
-                      {compatibilityInfo.text}
-                    </span>
                   </td>
                 </tr>
-              );
-            })}
+                {tracks.map((track) => {
+                  const bpmChange = Math.round(((track.adjustedBpm - track.bpm) / track.bpm) * 100);
+                  
+                  return (
+                    <tr
+                      key={`${track.id}-${track.matchType}`}
+                      className="border-t border-gray-800 hover:bg-gray-800/50 transition-colors duration-150"
+                    >
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => onTrackSelect?.(track)}
+                          className="text-white hover:text-primary-400 text-left transition-colors duration-200"
+                        >
+                          {track.title}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">{track.artist}</td>
+                      <td className="py-3 px-4 text-right font-mono text-gray-300">
+                        {Math.round(track.bpm)}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <span className="font-mono text-gray-300">
+                            {Math.round(track.adjustedBpm)}
+                          </span>
+                          {Math.abs(bpmChange) > 0 && (
+                            <span
+                              className={`flex items-center text-xs ${
+                                bpmChange > 0 ? 'text-success-400' : 'text-error-400'
+                              }`}
+                            >
+                              {bpmChange > 0 ? (
+                                <ArrowUp size={12} className="mr-0.5" />
+                              ) : (
+                                <ArrowDown size={12} className="mr-0.5" />
+                              )}
+                              {Math.abs(bpmChange)}%
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
+                          {track.originalKey}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`
+                          inline-flex items-center px-2.5 py-1 rounded-md
+                          ${track.originalKey !== track.shiftedKey
+                            ? 'bg-accent-800/50 border-accent-700/50 text-accent-200'
+                            : 'bg-gray-800 border border-gray-700 text-gray-300'
+                          }
+                        `}>
+                          {track.shiftedKey}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`
+                          inline-block px-3 py-1 rounded-full text-xs font-medium text-white
+                          ${track.matchType === 'native' ? 'bg-success-600' :
+                            track.matchType === 'pitch-shift' ? 'bg-accent-600' :
+                            'bg-primary-600'}
+                        `}>
+                          {track.compatibilityReason}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </tbody>
         </table>
       </div>

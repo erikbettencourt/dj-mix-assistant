@@ -1,5 +1,9 @@
-import { Track, CompatibleTrack } from '../types';
-import { calculateKeyShift, convertToCalemot, determineCompatibility } from './camelotLogic';
+import { Track, CompatibleTrack, CompatibilityType, CompatibilityDetails } from '../types';
+import { calculateKeyShift, convertToCalemot, getCamelotKeyInfo, determineCompatibility } from './camelotLogic';
+
+const MAX_SEMITONE_SHIFT = 3;
+const MAX_BPM_CHANGE_PERCENT = 8;
+const SEMITONE_BPM_RATIO = 0.06; // 6% BPM change = 1 semitone
 
 export const findCompatibleTracks = (
   referenceTrack: Track,
@@ -8,140 +12,129 @@ export const findCompatibleTracks = (
   if (!referenceTrack || !allTracks.length) {
     return [];
   }
-  
-  // Ensure the reference track has a Camelot key
+
   const refCamelotKey = referenceTrack.camelotKey || convertToCalemot(referenceTrack.key);
-  
-  // Process each track to find compatibility
+  const refKeyInfo = getCamelotKeyInfo(referenceTrack.key);
+
+  if (!refKeyInfo) return [];
+
   return allTracks
-    .filter(track => track.id !== referenceTrack.id) // Exclude the reference track
+    .filter(track => track.id !== referenceTrack.id)
     .map(track => {
-      // Calculate the BPM ratio needed to match the reference BPM
       const originalBpm = track.bpm;
-      const adjustedBpm = referenceTrack.bpm;
-      
-      // Calculate BPM change percentage
-      const bpmChangePercent = Math.abs((adjustedBpm - originalBpm) / originalBpm * 100);
-      
-      // If BPM change is more than 8%, mark as incompatible
-      if (bpmChangePercent > 8) {
-        return {
-          ...track,
-          originalKey: track.key,
-          adjustedBpm,
-          shiftedKey: track.key,
-          shiftedCamelotKey: track.camelotKey || convertToCalemot(track.key),
-          compatibilityType: 'incompatible',
-          compatibilityScore: 0,
-        };
+      const trackCamelotKey = track.camelotKey || convertToCalemot(track.key);
+      const trackKeyInfo = getCamelotKeyInfo(track.key);
+
+      if (!trackKeyInfo) return null;
+
+      // Check native compatibility first
+      const nativeCompatibility = determineCompatibility(refCamelotKey, trackCamelotKey);
+      if (nativeCompatibility.type !== 'incompatible') {
+        return createCompatibleTrack(track, {
+          type: nativeCompatibility.type,
+          semitoneShift: 0,
+          bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
+          description: nativeCompatibility.description,
+          score: nativeCompatibility.score
+        }, referenceTrack.bpm);
       }
-      
-      // Calculate what the key would be if we shifted the track to match the reference BPM
-      const shiftedKey = calculateKeyShift(track.key, originalBpm, adjustedBpm);
-      const shiftedCamelotKey = convertToCalemot(shiftedKey);
-      
-      // Determine compatibility between the reference track and this track
-      const { type: compatibilityType, score: compatibilityScore } = 
-        determineCompatibility(refCamelotKey, shiftedCamelotKey);
-      
-      return {
-        ...track,
-        originalKey: track.key,
-        adjustedBpm,
-        shiftedKey,
-        shiftedCamelotKey,
-        compatibilityType,
-        compatibilityScore,
-      };
+
+      // Try pitch shifting within limits
+      for (let shift = 1; shift <= MAX_SEMITONE_SHIFT; shift++) {
+        // Try shifting up
+        const shiftedUpKey = calculateKeyShift(track.key, shift);
+        const upCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedUpKey));
+        if (upCompatibility.type !== 'incompatible') {
+          return createCompatibleTrack(track, {
+            type: 'pitch-shift-up',
+            semitoneShift: shift,
+            bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
+            description: `Shift up ${shift} semitone${shift > 1 ? 's' : ''} for ${upCompatibility.description}`,
+            score: upCompatibility.score * 0.9 // Slight penalty for pitch shifting
+          }, referenceTrack.bpm);
+        }
+
+        // Try shifting down
+        const shiftedDownKey = calculateKeyShift(track.key, -shift);
+        const downCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedDownKey));
+        if (downCompatibility.type !== 'incompatible') {
+          return createCompatibleTrack(track, {
+            type: 'pitch-shift-down',
+            semitoneShift: -shift,
+            bpmAdjustment: ((referenceTrack.bpm - track.bpm) / track.bpm) * 100,
+            description: `Shift down ${shift} semitone${shift > 1 ? 's' : ''} for ${downCompatibility.description}`,
+            score: downCompatibility.score * 0.9
+          }, referenceTrack.bpm);
+        }
+      }
+
+      // Try BPM matching without pitch lock
+      const bpmChangePercent = ((referenceTrack.bpm - track.bpm) / track.bpm) * 100;
+      if (Math.abs(bpmChangePercent) <= MAX_BPM_CHANGE_PERCENT) {
+        const semitoneShift = Math.round(bpmChangePercent / (SEMITONE_BPM_RATIO * 100));
+        const shiftedKey = calculateKeyShift(track.key, semitoneShift);
+        const bpmMatchCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedKey));
+        
+        if (bpmMatchCompatibility.type !== 'incompatible') {
+          return createCompatibleTrack(track, {
+            type: 'bpm-match',
+            semitoneShift,
+            bpmAdjustment: bpmChangePercent,
+            description: `Match BPM (${semitoneShift > 0 ? '+' : ''}${semitoneShift} semitone shift)`,
+            score: bpmMatchCompatibility.score * 0.8 // Larger penalty for BPM matching
+          }, referenceTrack.bpm);
+        }
+      }
+
+      return null;
     })
-    .filter(track => track.compatibilityType !== 'incompatible') // Remove incompatible tracks
-    .sort((a, b) => b.compatibilityScore - a.compatibilityScore); // Sort by compatibility score
+    .filter((track): track is CompatibleTrack => track !== null)
+    .sort((a, b) => b.compatibility.score - a.compatibility.score);
 };
 
-// Function to determine if a BPM adjustment is within a reasonable range
-export const isBpmAdjustmentReasonable = (
-  originalBpm: number, 
+const createCompatibleTrack = (
+  track: Track,
+  compatibility: CompatibilityDetails,
   targetBpm: number
-): boolean => {
-  if (!originalBpm || !targetBpm) {
-    return false;
-  }
+): CompatibleTrack => {
+  const shiftedKey = calculateKeyShift(track.key, compatibility.semitoneShift);
   
-  const percentChange = Math.abs((targetBpm - originalBpm) / originalBpm) * 100;
-  return percentChange <= 8;
+  return {
+    ...track,
+    originalKey: track.key,
+    originalBpm: track.bpm,
+    adjustedBpm: targetBpm,
+    shiftedKey,
+    shiftedCamelotKey: convertToCalemot(shiftedKey),
+    compatibility
+  };
 };
 
-// Calculate the percentage change in BPM
-export const calculateBpmPercentageChange = (
-  originalBpm: number,
-  targetBpm: number
-): number => {
-  if (!originalBpm || !targetBpm) {
-    return 0;
-  }
-  
-  return ((targetBpm - originalBpm) / originalBpm) * 100;
-};
+export const groupCompatibleTracks = (
+  tracks: CompatibleTrack[]
+): CompatibilityGroup[] => {
+  const groups: CompatibilityGroup[] = [
+    {
+      title: "Native Compatible Tracks",
+      description: "These tracks are naturally compatible without any pitch shifting",
+      tracks: tracks.filter(t => 
+        ['exact', 'adjacent', 'relative'].includes(t.compatibility.type)
+      )
+    },
+    {
+      title: "Pitch Shifted Compatible Tracks",
+      description: "These tracks become compatible when pitch shifted",
+      tracks: tracks.filter(t => 
+        ['pitch-shift-up', 'pitch-shift-down'].includes(t.compatibility.type)
+      )
+    },
+    {
+      title: "BPM Matched Tracks",
+      description: "These tracks are compatible when matching BPM without pitch lock",
+      tracks: tracks.filter(t => t.compatibility.type === 'bpm-match')
+    }
+  ];
 
-// Filter tracks by compatibility type
-export const filterTracksByCompatibility = (
-  tracks: CompatibleTrack[],
-  filterType: string
-): CompatibleTrack[] => {
-  if (filterType === 'all') {
-    return tracks;
-  }
-  
-  if (filterType === 'exact') {
-    return tracks.filter(track => track.compatibilityType === 'exact');
-  }
-  
-  if (filterType === 'energy-change') {
-    return tracks.filter(track => 
-      track.compatibilityType === 'energy-boost' || 
-      track.compatibilityType === 'energy-drop'
-    );
-  }
-  
-  if (filterType === 'compatible') {
-    return tracks.filter(track => track.compatibilityScore >= 60);
-  }
-  
-  if (filterType === 'relatives') {
-    return tracks.filter(track => 
-      track.compatibilityType === 'relative-major' || 
-      track.compatibilityType === 'relative-minor'
-    );
-  }
-  
-  return tracks;
-};
-
-// Filter tracks by BPM range
-export const filterTracksByBpmRange = (
-  tracks: CompatibleTrack[],
-  minBpm: number,
-  maxBpm: number
-): CompatibleTrack[] => {
-  if (!minBpm && !maxBpm) {
-    return tracks;
-  }
-  
-  return tracks.filter(track => {
-    const bpm = track.bpm;
-    
-    if (minBpm && maxBpm) {
-      return bpm >= minBpm && bpm <= maxBpm;
-    }
-    
-    if (minBpm) {
-      return bpm >= minBpm;
-    }
-    
-    if (maxBpm) {
-      return bpm <= maxBpm;
-    }
-    
-    return true;
-  });
+  // Remove empty groups
+  return groups.filter(group => group.tracks.length > 0);
 };

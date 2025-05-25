@@ -98,7 +98,7 @@ export const findCompatibleTracks = (
             type: 'transposed',
             semitoneShift: shift,
             bpmAdjustment,
-            description: `Transpose ${Math.abs(shift)} semitone${Math.abs(shift) > 1 ? 's' : ''} ${shift > 0 ? 'up' : 'down'}`,
+            description: `${shift > 0 ? '+' : '-'}${Math.abs(shift)} semitone${Math.abs(shift) > 1 ? 's' : ''}`,
             score: 70 - (Math.abs(shift) * 5) - (bpmDiff * 2)
           }, referenceTrack.bpm));
         }

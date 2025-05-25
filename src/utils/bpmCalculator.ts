@@ -157,27 +157,27 @@ export const groupCompatibleTracks = (
 ): CompatibilityGroup[] => {
   const groups: CompatibilityGroup[] = [
     {
-      title: "🎯 Native Compatible Tracks",
+      title: "Native Compatible Tracks",
       icon: "target",
-      description: "Perfect matches using standard Camelot wheel rules",
+      description: "Perfect matches using standard Camelot wheel rules. These tracks will mix together harmonically with minimal risk of clashing notes. Includes exact key matches, adjacent keys (e.g., 8A → 7A or 9A), and relative major/minor pairs.",
       tracks: tracks.filter(t => t.compatibility.type === 'native')
     },
     {
-      title: "🔀 Diagonal Blends",
+      title: "Diagonal Blends",
       icon: "shuffle",
-      description: "Creative transitions using diagonal movement on the Camelot wheel",
+      description: "Creative transitions using diagonal movement on the Camelot wheel. These tracks move +1 position and switch between major/minor modes. While slightly outside traditional rules, they can work well when the melodies align.",
       tracks: tracks.filter(t => t.compatibility.type === 'diagonal')
     },
     {
-      title: "⚡ Energy Transitions",
+      title: "Energy Transitions",
       icon: "zap",
-      description: "Dramatic energy shifts using ±7 step movements",
+      description: "Dramatic energy shifts using ±7 step movements. These tracks are not traditionally compatible but can create powerful transitions during breakdowns or when mixing instrumental sections. Use during builds, drops, or when intentionally changing the energy level.",
       tracks: tracks.filter(t => t.compatibility.type === 'energy')
     },
     {
-      title: "🎚️ Transposed Options",
+      title: "Transposed Options",
       icon: "sliders",
-      description: "Compatible after transposing the selected track",
+      description: "Compatible matches when transposing the selected track by ±1 to ±3 semitones. These tracks become harmonically compatible after pitch shifting the reference track. Best used in DAWs or when performing with pitch control.",
       tracks: tracks.filter(t => t.compatibility.type === 'transposed')
     }
   ];

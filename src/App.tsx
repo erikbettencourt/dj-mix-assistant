@@ -221,14 +221,14 @@ function App() {
                   </div>
 
                   <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                    <div className="flex justify-between items-center">
-                      <div className="space-y-2">
-                        <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
-                        <div className="flex items-center gap-8 text-xl text-gray-300">
-                          <span>by {selectedTrack.artist}</span>
-                          <span>{Math.round(selectedTrack.bpm)} BPM</span>
-                          <span>{selectedTrack.camelotKey}</span>
-                        </div>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-3xl font-bold text-white mb-2">{selectedTrack.title}</h4>
+                        <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
+                      </div>
+                      <div className="flex items-center gap-8 text-xl text-gray-300">
+                        <span>{Math.round(selectedTrack.bpm)} BPM</span>
+                        <span>{selectedTrack.camelotKey}</span>
                       </div>
                     </div>
                   </div>

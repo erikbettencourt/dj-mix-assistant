@@ -16,6 +16,12 @@ export const findCompatibleTracks = (
 
   if (!refKeyInfo) return [];
 
+  // Calculate energy transition target keys
+  const energyBoostKey = calculateKeyShift(referenceTrack.key, 1); // +7 steps = +1 semitone
+  const energyDropKey = calculateKeyShift(referenceTrack.key, -1); // -7 steps = -1 semitone
+  const energyBoostCamelot = convertToCalemot(energyBoostKey);
+  const energyDropCamelot = convertToCalemot(energyDropKey);
+
   return allTracks
     .filter(track => track.id !== referenceTrack.id)
     .flatMap(track => {
@@ -43,7 +49,7 @@ export const findCompatibleTracks = (
           semitoneShift: 0,
           bpmAdjustment,
           description: nativeCompatibility.description,
-          score: 100 - (bpmDiff * 2) // Reduce score based on BPM difference
+          score: 100 - (bpmDiff * 2)
         }, referenceTrack.bpm));
       }
 
@@ -59,21 +65,29 @@ export const findCompatibleTracks = (
         }, referenceTrack.bpm));
       }
 
-      // 3. Check Energy Transitions (±7 steps)
-      const energyCompatibility = checkEnergyCompatibility(refKeyInfo, trackKeyInfo);
-      if (energyCompatibility) {
+      // 3. Check Energy Transitions
+      // Compare track's original key with the energy transition target keys
+      if (trackCamelotKey === energyBoostCamelot) {
         compatibleTracks.push(createCompatibleTrack(track, {
           type: 'energy',
-          semitoneShift: energyCompatibility.semitoneShift,
+          semitoneShift: 1,
           bpmAdjustment,
-          description: energyCompatibility.description,
+          description: 'Energy Boost (+7 steps)',
+          score: 75 - (bpmDiff * 2)
+        }, referenceTrack.bpm));
+      } else if (trackCamelotKey === energyDropCamelot) {
+        compatibleTracks.push(createCompatibleTrack(track, {
+          type: 'energy',
+          semitoneShift: -1,
+          bpmAdjustment,
+          description: 'Energy Drop (-7 steps)',
           score: 75 - (bpmDiff * 2)
         }, referenceTrack.bpm));
       }
 
-      // 4. Check Transposed Compatibility (±1 to ±3 semitones)
+      // 4. Check Transposed Compatibility
       for (let shift = -3; shift <= 3; shift++) {
-        if (shift === 0) continue;
+        if (shift === 0 || Math.abs(shift) === 1) continue; // Skip 0 and ±1 as they're handled by energy transitions
 
         const transposedKey = calculateKeyShift(refKeyInfo.key, shift);
         const transposedCamelotKey = convertToCalemot(transposedKey);
@@ -99,53 +113,26 @@ const createCompatibleTrack = (
   track: Track,
   compatibility: CompatibilityDetails,
   targetBpm: number
-): CompatibleTrack => {
-  const shiftedKey = calculateKeyShift(track.key, compatibility.semitoneShift);
-  
-  return {
-    ...track,
-    originalKey: track.key,
-    originalBpm: track.bpm,
-    adjustedBpm: targetBpm,
-    shiftedKey,
-    shiftedCamelotKey: convertToCalemot(shiftedKey),
-    compatibility
-  };
-};
+): CompatibleTrack => ({
+  ...track,
+  originalKey: track.key,
+  originalBpm: track.bpm,
+  adjustedBpm: targetBpm,
+  shiftedKey: calculateKeyShift(track.key, compatibility.semitoneShift),
+  shiftedCamelotKey: convertToCalemot(calculateKeyShift(track.key, compatibility.semitoneShift)),
+  compatibility
+});
 
 const checkDiagonalCompatibility = (
   refInfo: CamelotKeyInfo,
   trackInfo: CamelotKeyInfo
 ) => {
-  // Check for +1 number and mode switch
   const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
   const modeSwitch = refInfo.letter !== trackInfo.letter;
 
   if (numberDiff === 1 && modeSwitch) {
     return {
       description: `Diagonal Blend (${refInfo.camelotKey} → ${trackInfo.camelotKey})`
-    };
-  }
-
-  return null;
-};
-
-const checkEnergyCompatibility = (
-  refInfo: CamelotKeyInfo,
-  trackInfo: CamelotKeyInfo
-) => {
-  // Check for ±7 steps (energy transitions)
-  const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
-  
-  if (numberDiff === 7) {
-    return {
-      semitoneShift: 1,
-      description: 'Energy Boost (+7 steps)'
-    };
-  } else if (numberDiff === 5) { // -7 steps = +5 steps in the other direction
-    return {
-      semitoneShift: -1,
-      description: 'Energy Drop (-7 steps)'
     };
   }
 
@@ -171,13 +158,13 @@ export const groupCompatibleTracks = (
     {
       title: "Energy Transitions",
       icon: "zap",
-      description: "Dramatic energy shifts using ±7 step movements. These tracks are not traditionally compatible but can create powerful transitions during breakdowns or when mixing instrumental sections. Use during builds, drops, or when intentionally changing the energy level.",
+      description: "Dramatic energy shifts using ±7 step movements. These tracks become compatible when the selected track is transposed by ±1 semitone, creating powerful transitions during breakdowns or when mixing instrumental sections.",
       tracks: tracks.filter(t => t.compatibility.type === 'energy')
     },
     {
       title: "Transposed Options",
       icon: "sliders",
-      description: "Compatible matches when transposing the selected track by ±1 to ±3 semitones. These tracks become harmonically compatible after pitch shifting the reference track. Best used in DAWs or when performing with pitch control.",
+      description: "Compatible matches when transposing the selected track by ±2 to ±3 semitones. These tracks become harmonically compatible after pitch shifting the reference track. Best used in DAWs or when performing with pitch control.",
       tracks: tracks.filter(t => t.compatibility.type === 'transposed')
     }
   ];
@@ -185,15 +172,12 @@ export const groupCompatibleTracks = (
   // Sort tracks within each group by score
   groups.forEach(group => {
     group.tracks.sort((a, b) => {
-      // First by compatibility score
       if (b.compatibility.score !== a.compatibility.score) {
         return b.compatibility.score - a.compatibility.score;
       }
-      // Then by BPM adjustment
       return Math.abs(a.compatibility.bpmAdjustment) - Math.abs(b.compatibility.bpmAdjustment);
     });
   });
 
-  // Remove empty groups
   return groups.filter(group => group.tracks.length > 0);
 };

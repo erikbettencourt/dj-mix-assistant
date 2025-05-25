@@ -39,6 +39,32 @@ const musicalToCamelot: Record<string, CamelotKeyInfo> = {
   'Cm': { key: 'Cm', camelotKey: '5A', number: 5, letter: 'A', type: 'minor' },
   'Gm': { key: 'Gm', camelotKey: '6A', number: 6, letter: 'A', type: 'minor' },
   'Dm': { key: 'Dm', camelotKey: '7A', number: 7, letter: 'A', type: 'minor' },
+  
+  // Open key format (already in Camelot notation)
+  '1A': { key: 'G#m/Abm', camelotKey: '1A', number: 1, letter: 'A', type: 'minor' },
+  '2A': { key: 'D#m/Ebm', camelotKey: '2A', number: 2, letter: 'A', type: 'minor' },
+  '3A': { key: 'A#m/Bbm', camelotKey: '3A', number: 3, letter: 'A', type: 'minor' },
+  '4A': { key: 'Fm', camelotKey: '4A', number: 4, letter: 'A', type: 'minor' },
+  '5A': { key: 'Cm', camelotKey: '5A', number: 5, letter: 'A', type: 'minor' },
+  '6A': { key: 'Gm', camelotKey: '6A', number: 6, letter: 'A', type: 'minor' },
+  '7A': { key: 'Dm', camelotKey: '7A', number: 7, letter: 'A', type: 'minor' },
+  '8A': { key: 'Am', camelotKey: '8A', number: 8, letter: 'A', type: 'minor' },
+  '9A': { key: 'Em', camelotKey: '9A', number: 9, letter: 'A', type: 'minor' },
+  '10A': { key: 'Bm', camelotKey: '10A', number: 10, letter: 'A', type: 'minor' },
+  '11A': { key: 'F#m/Gbm', camelotKey: '11A', number: 11, letter: 'A', type: 'minor' },
+  '12A': { key: 'C#m/Dbm', camelotKey: '12A', number: 12, letter: 'A', type: 'minor' },
+  '1B': { key: 'B', camelotKey: '1B', number: 1, letter: 'B', type: 'major' },
+  '2B': { key: 'F#/Gb', camelotKey: '2B', number: 2, letter: 'B', type: 'major' },
+  '3B': { key: 'C#/Db', camelotKey: '3B', number: 3, letter: 'B', type: 'major' },
+  '4B': { key: 'G#/Ab', camelotKey: '4B', number: 4, letter: 'B', type: 'major' },
+  '5B': { key: 'D#/Eb', camelotKey: '5B', number: 5, letter: 'B', type: 'major' },
+  '6B': { key: 'A#/Bb', camelotKey: '6B', number: 6, letter: 'B', type: 'major' },
+  '7B': { key: 'F', camelotKey: '7B', number: 7, letter: 'B', type: 'major' },
+  '8B': { key: 'C', camelotKey: '8B', number: 8, letter: 'B', type: 'major' },
+  '9B': { key: 'G', camelotKey: '9B', number: 9, letter: 'B', type: 'major' },
+  '10B': { key: 'D', camelotKey: '10B', number: 10, letter: 'B', type: 'major' },
+  '11B': { key: 'A', camelotKey: '11B', number: 11, letter: 'B', type: 'major' },
+  '12B': { key: 'E', camelotKey: '12B', number: 12, letter: 'B', type: 'major' },
 };
 
 // Convert any key format to Camelot notation
@@ -72,6 +98,7 @@ export const convertToCalemot = (key: string): string => {
     }
   }
   
+  // Handle other notations or return unknown if not recognized
   return 'Unknown';
 };
 
@@ -89,6 +116,7 @@ export const getCamelotKeyInfo = (key: string): CamelotKeyInfo | null => {
   // Convert to Camelot and then get the info
   const camelotKey = convertToCalemot(key);
   
+  // Return the info for the Camelot key
   return musicalToCamelot[camelotKey] || null;
 };
 
@@ -103,16 +131,13 @@ export const calculateKeyShift = (key: string, semitoneShift: number): string =>
     return key;
   }
 
-  // Each semitone shift corresponds to 7 steps in the Camelot wheel
+  // Calculate new position in Camelot wheel
   let newNumber = keyInfo.number;
+  const direction = semitoneShift > 0 ? 1 : -1;
+
+  // Each semitone is equivalent to moving 7 steps in the Camelot wheel
   for (let i = 0; i < Math.abs(semitoneShift); i++) {
-    if (semitoneShift > 0) {
-      // Moving up by a semitone (+7 steps)
-      newNumber = newNumber + 7 > 12 ? newNumber + 7 - 12 : newNumber + 7;
-    } else {
-      // Moving down by a semitone (-7 steps)
-      newNumber = newNumber - 7 <= 0 ? newNumber - 7 + 12 : newNumber - 7;
-    }
+    newNumber = ((newNumber + (direction * 7) - 1 + 12) % 12) + 1;
   }
 
   const newCamelotKey = `${newNumber}${keyInfo.letter}`;
@@ -134,69 +159,45 @@ const normalizeCamelotNumber = (num: number): number => {
   return num;
 };
 
-// Calculate energy transition keys
-export const getEnergyTransitionKeys = (key: string): { boost: string; drop: string } => {
-  const keyInfo = getCamelotKeyInfo(key);
-  if (!keyInfo) {
-    return { boost: 'Unknown', drop: 'Unknown' };
-  }
-
-  // Energy boost: +7 steps (clockwise)
-  const boostNumber = normalizeCamelotNumber(keyInfo.number + 7);
-  const boostKey = `${boostNumber}${keyInfo.letter}`;
-
-  // Energy drop: -7 steps (counterclockwise)
-  const dropNumber = normalizeCamelotNumber(keyInfo.number - 7);
-  const dropKey = `${dropNumber}${keyInfo.letter}`;
-
-  return { boost: boostKey, drop: dropKey };
-};
-
 // Determine compatibility between two Camelot keys
 export const determineCompatibility = (
   referenceKey: string,
   trackKey: string
-): { type: CompatibilityType; description: string } => {
+) => {
   if (referenceKey === 'Unknown' || trackKey === 'Unknown') {
-    return { type: 'incompatible', description: 'Incompatible' };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
   }
 
   const refInfo = getCamelotKeyInfo(referenceKey);
   const trackInfo = getCamelotKeyInfo(trackKey);
 
   if (!refInfo || !trackInfo) {
-    return { type: 'incompatible', description: 'Incompatible' };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
   }
 
-  // Check energy transitions first
-  const energyKeys = getEnergyTransitionKeys(referenceKey);
-  if (trackKey === energyKeys.boost) {
-    return { type: 'energy', description: 'Energy Boost (+7 steps)' };
-  }
-  if (trackKey === energyKeys.drop) {
-    return { type: 'energy', description: 'Energy Drop (-7 steps)' };
-  }
-
-  // Check other compatibility types
+  // Same key
   if (refInfo.camelotKey === trackInfo.camelotKey) {
-    return { type: 'native', description: 'Perfect Match' };
+    return { type: 'native' as CompatibilityType, description: 'Perfect Match' };
   }
 
   // Adjacent keys (same mode)
   if (refInfo.letter === trackInfo.letter) {
     const diff = Math.abs(refInfo.number - trackInfo.number);
     if (diff === 1 || diff === 11) {
-      return { type: 'native', description: 'Adjacent Key' };
+      return { 
+        type: 'native' as CompatibilityType, 
+        description: `Adjacent Key (${trackInfo.camelotKey})`
+      };
     }
   }
 
-  // Relative major/minor
+  // Relative major/minor (same number, different mode)
   if (refInfo.number === trackInfo.number && refInfo.letter !== trackInfo.letter) {
     return { 
-      type: 'native',
+      type: 'native' as CompatibilityType, 
       description: `Relative ${trackInfo.letter === 'A' ? 'Minor' : 'Major'}`
     };
   }
 
-  return { type: 'incompatible', description: 'Incompatible' };
+  return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
 };

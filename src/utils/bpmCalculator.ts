@@ -1,7 +1,7 @@
 import { Track, CompatibleTrack, CompatibilityType, CompatibilityDetails, CompatibilityGroup } from '../types';
 import { calculateKeyShift, convertToCalemot, getCamelotKeyInfo, determineCompatibility } from './camelotLogic';
 
-const MAX_BPM_ADJUSTMENT = 4; // Maximum BPM adjustment allowed (±4 BPM)
+const MAX_BPM_ADJUSTMENT = 8; // Increased from 4 to 8% to allow more matches
 
 export const findCompatibleTracks = (
   referenceTrack: Track,
@@ -21,9 +21,10 @@ export const findCompatibleTracks = (
     .flatMap(track => {
       const originalBpm = track.bpm;
       const bpmDiff = Math.abs(referenceTrack.bpm - track.bpm);
+      const bpmAdjustmentPercent = (bpmDiff / track.bpm) * 100;
       
       // Skip if BPM difference is too large
-      if (bpmDiff > MAX_BPM_ADJUSTMENT) {
+      if (bpmAdjustmentPercent > MAX_BPM_ADJUSTMENT) {
         return [];
       }
 
@@ -43,7 +44,7 @@ export const findCompatibleTracks = (
           semitoneShift: 0,
           bpmAdjustment,
           description: nativeCompatibility.description,
-          score: 100 - (bpmDiff * 2) // Reduce score based on BPM difference
+          score: 100 - (Math.abs(bpmAdjustment) * 2)
         }, referenceTrack.bpm));
       }
 
@@ -55,7 +56,7 @@ export const findCompatibleTracks = (
           semitoneShift: 0,
           bpmAdjustment,
           description: diagonalCompatibility.description,
-          score: 85 - (bpmDiff * 2)
+          score: 85 - (Math.abs(bpmAdjustment) * 2)
         }, referenceTrack.bpm));
       }
 
@@ -67,7 +68,7 @@ export const findCompatibleTracks = (
           semitoneShift: energyCompatibility.semitoneShift,
           bpmAdjustment,
           description: energyCompatibility.description,
-          score: 75 - (bpmDiff * 2)
+          score: 75 - (Math.abs(bpmAdjustment) * 2)
         }, referenceTrack.bpm));
       }
 
@@ -85,7 +86,7 @@ export const findCompatibleTracks = (
             semitoneShift: shift,
             bpmAdjustment,
             description: `Transpose ${Math.abs(shift)} semitone${Math.abs(shift) > 1 ? 's' : ''} ${shift > 0 ? 'up' : 'down'}`,
-            score: 70 - (Math.abs(shift) * 5) - (bpmDiff * 2)
+            score: 70 - (Math.abs(shift) * 5) - (Math.abs(bpmAdjustment) * 2)
           }, referenceTrack.bpm));
         }
       }
@@ -121,7 +122,7 @@ const checkDiagonalCompatibility = (
   const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
   const modeSwitch = refInfo.letter !== trackInfo.letter;
 
-  if (numberDiff === 1 && modeSwitch) {
+  if ((numberDiff === 1 || numberDiff === 11) && modeSwitch) {
     return {
       description: `Diagonal Blend (${refInfo.camelotKey} → ${trackInfo.camelotKey})`
     };
@@ -137,12 +138,12 @@ const checkEnergyCompatibility = (
   // Check for ±7 steps (energy transitions)
   const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
   
-  if (numberDiff === 7) {
+  if (numberDiff === 7 && refInfo.letter === trackInfo.letter) {
     return {
       semitoneShift: 1,
       description: 'Energy Boost (+7 steps)'
     };
-  } else if (numberDiff === 5) { // -7 steps = +5 steps in the other direction
+  } else if (numberDiff === 5 && refInfo.letter === trackInfo.letter) { // -7 steps = +5 steps in the other direction
     return {
       semitoneShift: -1,
       description: 'Energy Drop (-7 steps)'

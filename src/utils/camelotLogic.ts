@@ -165,33 +165,39 @@ export const determineCompatibility = (
   trackKey: string
 ) => {
   if (referenceKey === 'Unknown' || trackKey === 'Unknown') {
-    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
   }
 
   const refInfo = getCamelotKeyInfo(referenceKey);
   const trackInfo = getCamelotKeyInfo(trackKey);
 
   if (!refInfo || !trackInfo) {
-    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
+    return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
   }
 
-  // Exact match
+  // Same key
   if (refInfo.camelotKey === trackInfo.camelotKey) {
-    return { type: 'exact' as CompatibilityType, description: 'Perfect Match', score: 100 };
+    return { type: 'native' as CompatibilityType, description: 'Perfect Match' };
   }
 
-  // Adjacent keys (perfect fifth/fourth)
+  // Adjacent keys (same mode)
   if (refInfo.letter === trackInfo.letter) {
     const diff = Math.abs(refInfo.number - trackInfo.number);
     if (diff === 1 || diff === 11) {
-      return { type: 'adjacent' as CompatibilityType, description: 'Perfect Fifth/Fourth', score: 90 };
+      return { 
+        type: 'native' as CompatibilityType, 
+        description: `Adjacent Key (${trackInfo.camelotKey})`
+      };
     }
   }
 
-  // Relative major/minor
+  // Relative major/minor (same number, different mode)
   if (refInfo.number === trackInfo.number && refInfo.letter !== trackInfo.letter) {
-    return { type: 'relative' as CompatibilityType, description: 'Relative Major/Minor', score: 85 };
+    return { 
+      type: 'native' as CompatibilityType, 
+      description: `Relative ${trackInfo.letter === 'A' ? 'Minor' : 'Major'}`
+    };
   }
 
-  return { type: 'incompatible' as CompatibilityType, description: 'Incompatible', score: 0 };
+  return { type: 'incompatible' as CompatibilityType, description: 'Incompatible' };
 };

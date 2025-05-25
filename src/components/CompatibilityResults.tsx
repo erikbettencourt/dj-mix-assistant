@@ -159,7 +159,7 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
                         <div className="flex items-center justify-center">
                           <span
                             className={`
-                              inline-block px-3 py-1 rounded-full text-xs font-medium
+                              inline-flex items-center justify-center min-w-[120px] px-3 py-1 rounded-full text-xs font-medium
                               ${getCompatibilityStyle(track.compatibility.type)}
                             `}
                           >

@@ -24,14 +24,12 @@ function App() {
   const [currentFileName, setCurrentFileName] = useState<string | undefined>();
   const [selectedTrackHistory, setSelectedTrackHistory] = useState<CompatibleTrack[]>([]);
 
-  // Handle file upload
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     setError(null);
     try {
       const parsedTracks = await parseXmlFile(file);
       
-      // Add Camelot key to each track
       const tracksWithCamelot = parsedTracks.map(track => ({
         ...track,
         camelotKey: convertToCalemot(track.key)
@@ -40,7 +38,6 @@ function App() {
       setTracks(tracksWithCamelot);
       setCurrentFileName(file.name);
       
-      // Reset selection and results
       setSelectedTrack(null);
       setCompatibleTracks([]);
       setSelectedTrackHistory([]);
@@ -53,7 +50,6 @@ function App() {
     }
   };
 
-  // Handle sample data
   const handleUseSampleData = () => {
     setTracks(sampleTracks);
     setCurrentFileName('sample-data.xml');
@@ -64,7 +60,6 @@ function App() {
     navigate('/');
   };
 
-  // Handle file removal
   const handleFileRemove = () => {
     setTracks([]);
     setSelectedTrack(null);
@@ -75,7 +70,6 @@ function App() {
     navigate('/');
   };
 
-  // Handle track selection
   const handleTrackSelect = (track: Track | null) => {
     if (!track) {
       setSelectedTrack(null);
@@ -92,14 +86,12 @@ function App() {
     
     setSelectedTrack(trackWithCamelot);
     
-    // Find compatible tracks
     const compatible = findCompatibleTracks(trackWithCamelot, tracks);
     setCompatibleTracks(compatible);
     setSelectedTrackHistory([trackWithCamelot as CompatibleTrack]);
     navigate(`/track/${track.id}`);
   };
 
-  // Handle compatible track selection
   const handleCompatibleTrackSelect = (track: CompatibleTrack) => {
     const originalTrack = tracks.find(t => t.id === track.id);
     if (originalTrack) {
@@ -110,7 +102,6 @@ function App() {
       
       setSelectedTrack(trackWithCamelot);
       
-      // Find compatible tracks with the adjusted BPM and shifted key
       const modifiedTrack = {
         ...trackWithCamelot,
         bpm: track.adjustedBpm,
@@ -120,13 +111,11 @@ function App() {
       const compatible = findCompatibleTracks(modifiedTrack, tracks);
       setCompatibleTracks(compatible);
       
-      // Update track history
       setSelectedTrackHistory(prev => [...prev, track]);
       navigate(`/track/${track.id}`);
     }
   };
 
-  // Handle breadcrumb navigation
   const handleBreadcrumbClick = (index: number) => {
     if (index === -1) {
       setSelectedTrack(null);
@@ -232,19 +221,13 @@ function App() {
                   </div>
 
                   <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-center">
                       <div className="space-y-2">
                         <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
-                        <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
-                      </div>
-                      <div className="flex items-center gap-8">
-                        <div>
-                          <span className="text-sm text-gray-400 mb-1 block">BPM</span>
-                          <p className="text-lg font-mono">{Math.round(selectedTrack.bpm)}</p>
-                        </div>
-                        <div>
-                          <span className="text-sm text-gray-400 mb-1 block">Key</span>
-                          <p className="text-lg">{selectedTrack.camelotKey}</p>
+                        <div className="flex items-center gap-8 text-xl text-gray-300">
+                          <span>by {selectedTrack.artist}</span>
+                          <span>{Math.round(selectedTrack.bpm)} BPM</span>
+                          <span>{selectedTrack.camelotKey}</span>
                         </div>
                       </div>
                     </div>

@@ -34,6 +34,14 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
     return <Music size={16} />;
   };
 
+  const getTabTitle = (title: string) => {
+    if (title.includes('Native')) return 'Native';
+    if (title.includes('Diagonal')) return 'Diagonal';
+    if (title.includes('Energy')) return 'Energy';
+    if (title.includes('Transposed')) return 'Transposed';
+    return title;
+  };
+
   return (
     <motion.div
       className="space-y-8 mt-8"
@@ -57,7 +65,7 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
             >
               <span className="flex items-center gap-2">
                 {getTabIcon(group.title)}
-                <span>{group.title} ({group.tracks.length})</span>
+                <span>{getTabTitle(group.title)} ({group.tracks.length})</span>
               </span>
             </button>
           ))}
@@ -131,25 +139,21 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                          <div className="flex flex-col items-center">
+                        {keyChanged ? (
+                          <div className="flex items-center justify-center space-x-2">
                             <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
                               {track.camelotKey}
                             </span>
-                            <span className="text-xs text-gray-500 mt-1">{track.originalKey}</span>
+                            <span className="text-gray-500">→</span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-accent-800/50 border border-accent-700/50 text-accent-200">
+                              {track.shiftedCamelotKey}
+                            </span>
                           </div>
-                          {keyChanged && (
-                            <>
-                              <span className="text-gray-500">→</span>
-                              <div className="flex flex-col items-center">
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-accent-800/50 border border-accent-700/50 text-accent-200">
-                                  {track.shiftedCamelotKey}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-1">{track.shiftedKey}</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
+                            {track.camelotKey}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center">

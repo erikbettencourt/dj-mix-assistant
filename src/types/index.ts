@@ -8,18 +8,16 @@ export interface Track {
 }
 
 export type CompatibilityType = 
-  | 'exact'               // Same key
-  | 'adjacent'            // Next key in Camelot wheel
-  | 'relative'            // Relative major/minor
-  | 'pitch-shift-up'      // Compatible after shifting up
-  | 'pitch-shift-down'    // Compatible after shifting down
-  | 'bpm-match'          // Compatible when matching BPM without pitch lock
-  | 'incompatible';      // Not compatible by any method
+  | 'native'           // Same key or adjacent in Camelot wheel
+  | 'diagonal'         // Diagonal blend (+1 and mode switch)
+  | 'energy'          // Energy transition (±7 steps)
+  | 'transposed'      // Compatible after transposing selected track
+  | 'incompatible';   // Not compatible by any method
 
 export interface CompatibilityDetails {
   type: CompatibilityType;
-  semitoneShift: number;  // 0 for native compatibility, otherwise the shift required
-  bpmAdjustment: number;  // Percentage change in BPM
+  semitoneShift: number;  // Semitone shift required (if any)
+  bpmAdjustment: number;  // BPM adjustment percentage
   description: string;    // Human readable explanation
   score: number;         // Compatibility score (0-100)
 }
@@ -43,6 +41,7 @@ export interface CamelotKeyInfo {
 
 export interface CompatibilityGroup {
   title: string;
+  icon: string;
   description: string;
   tracks: CompatibleTrack[];
 }

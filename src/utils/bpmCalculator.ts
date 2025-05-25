@@ -1,9 +1,7 @@
 import { Track, CompatibleTrack, CompatibilityType, CompatibilityDetails, CompatibilityGroup } from '../types';
 import { calculateKeyShift, convertToCalemot, getCamelotKeyInfo, determineCompatibility } from './camelotLogic';
 
-const MAX_SEMITONE_SHIFT = 3;
-const MAX_BPM_CHANGE_PERCENT = 6; // Changed from 8% to 6%
-const SEMITONE_BPM_RATIO = 0.06; // 6% BPM change = 1 semitone
+const MAX_BPM_ADJUSTMENT = 4; // Maximum BPM adjustment allowed (±4 BPM)
 
 export const findCompatibleTracks = (
   referenceTrack: Track,
@@ -22,13 +20,14 @@ export const findCompatibleTracks = (
     .filter(track => track.id !== referenceTrack.id)
     .flatMap(track => {
       const originalBpm = track.bpm;
-      const bpmChangePercent = ((referenceTrack.bpm - track.bpm) / track.bpm) * 100;
-
-      // Filter out tracks with BPM changes greater than MAX_BPM_CHANGE_PERCENT
-      if (Math.abs(bpmChangePercent) > MAX_BPM_CHANGE_PERCENT) {
+      const bpmDiff = Math.abs(referenceTrack.bpm - track.bpm);
+      
+      // Skip if BPM difference is too large
+      if (bpmDiff > MAX_BPM_ADJUSTMENT) {
         return [];
       }
 
+      const bpmAdjustment = ((referenceTrack.bpm - track.bpm) / track.bpm) * 100;
       const trackCamelotKey = track.camelotKey || convertToCalemot(track.key);
       const trackKeyInfo = getCamelotKeyInfo(track.key);
 
@@ -36,60 +35,59 @@ export const findCompatibleTracks = (
 
       const compatibleTracks: CompatibleTrack[] = [];
 
-      // Check native compatibility first
+      // 1. Check Native Compatibility
       const nativeCompatibility = determineCompatibility(refCamelotKey, trackCamelotKey);
-      if (nativeCompatibility.type !== 'incompatible') {
+      if (nativeCompatibility.type === 'native') {
         compatibleTracks.push(createCompatibleTrack(track, {
-          type: nativeCompatibility.type,
+          type: 'native',
           semitoneShift: 0,
-          bpmAdjustment: bpmChangePercent,
+          bpmAdjustment,
           description: nativeCompatibility.description,
-          score: nativeCompatibility.score - Math.abs(bpmChangePercent) // Reduce score based on BPM change
+          score: 100 - (bpmDiff * 2) // Reduce score based on BPM difference
         }, referenceTrack.bpm));
       }
 
-      // Try pitch shifting within limits
-      for (let shift = 1; shift <= MAX_SEMITONE_SHIFT; shift++) {
-        // Try shifting up
-        const shiftedUpKey = calculateKeyShift(track.key, shift);
-        const upCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedUpKey));
-        if (upCompatibility.type !== 'incompatible') {
-          compatibleTracks.push(createCompatibleTrack(track, {
-            type: 'pitch-shift-up',
-            semitoneShift: shift,
-            bpmAdjustment: bpmChangePercent,
-            description: `Shift up ${shift} semitone${shift > 1 ? 's' : ''} for ${upCompatibility.description}`,
-            score: upCompatibility.score * 0.9 - Math.abs(bpmChangePercent) - (shift * 2) // Penalties for pitch shift and BPM change
-          }, referenceTrack.bpm));
-        }
-
-        // Try shifting down
-        const shiftedDownKey = calculateKeyShift(track.key, -shift);
-        const downCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedDownKey));
-        if (downCompatibility.type !== 'incompatible') {
-          compatibleTracks.push(createCompatibleTrack(track, {
-            type: 'pitch-shift-down',
-            semitoneShift: -shift,
-            bpmAdjustment: bpmChangePercent,
-            description: `Shift down ${shift} semitone${shift > 1 ? 's' : ''} for ${downCompatibility.description}`,
-            score: downCompatibility.score * 0.9 - Math.abs(bpmChangePercent) - (shift * 2)
-          }, referenceTrack.bpm));
-        }
-      }
-
-      // Try BPM matching without pitch lock
-      const semitoneShift = Math.round(bpmChangePercent / (SEMITONE_BPM_RATIO * 100));
-      const shiftedKey = calculateKeyShift(track.key, semitoneShift);
-      const bpmMatchCompatibility = determineCompatibility(refCamelotKey, convertToCalemot(shiftedKey));
-      
-      if (bpmMatchCompatibility.type !== 'incompatible') {
+      // 2. Check Diagonal Blend
+      const diagonalCompatibility = checkDiagonalCompatibility(refKeyInfo, trackKeyInfo);
+      if (diagonalCompatibility) {
         compatibleTracks.push(createCompatibleTrack(track, {
-          type: 'bpm-match',
-          semitoneShift,
-          bpmAdjustment: bpmChangePercent,
-          description: `Match BPM (${semitoneShift > 0 ? '+' : ''}${semitoneShift} semitone shift)`,
-          score: bpmMatchCompatibility.score * 0.8 - Math.abs(bpmChangePercent) * 2 // Larger penalty for BPM matching
+          type: 'diagonal',
+          semitoneShift: 0,
+          bpmAdjustment,
+          description: diagonalCompatibility.description,
+          score: 85 - (bpmDiff * 2)
         }, referenceTrack.bpm));
+      }
+
+      // 3. Check Energy Transitions (±7 steps)
+      const energyCompatibility = checkEnergyCompatibility(refKeyInfo, trackKeyInfo);
+      if (energyCompatibility) {
+        compatibleTracks.push(createCompatibleTrack(track, {
+          type: 'energy',
+          semitoneShift: energyCompatibility.semitoneShift,
+          bpmAdjustment,
+          description: energyCompatibility.description,
+          score: 75 - (bpmDiff * 2)
+        }, referenceTrack.bpm));
+      }
+
+      // 4. Check Transposed Compatibility (±1 to ±3 semitones)
+      for (let shift = -3; shift <= 3; shift++) {
+        if (shift === 0) continue;
+
+        const transposedKey = calculateKeyShift(refKeyInfo.key, shift);
+        const transposedCamelotKey = convertToCalemot(transposedKey);
+        const compatibility = determineCompatibility(transposedCamelotKey, trackCamelotKey);
+
+        if (compatibility.type === 'native') {
+          compatibleTracks.push(createCompatibleTrack(track, {
+            type: 'transposed',
+            semitoneShift: shift,
+            bpmAdjustment,
+            description: `Transpose ${Math.abs(shift)} semitone${Math.abs(shift) > 1 ? 's' : ''} ${shift > 0 ? 'up' : 'down'}`,
+            score: 70 - (Math.abs(shift) * 5) - (bpmDiff * 2)
+          }, referenceTrack.bpm));
+        }
       }
 
       return compatibleTracks;
@@ -115,51 +113,86 @@ const createCompatibleTrack = (
   };
 };
 
+const checkDiagonalCompatibility = (
+  refInfo: CamelotKeyInfo,
+  trackInfo: CamelotKeyInfo
+) => {
+  // Check for +1 number and mode switch
+  const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
+  const modeSwitch = refInfo.letter !== trackInfo.letter;
+
+  if (numberDiff === 1 && modeSwitch) {
+    return {
+      description: `Diagonal Blend (${refInfo.camelotKey} → ${trackInfo.camelotKey})`
+    };
+  }
+
+  return null;
+};
+
+const checkEnergyCompatibility = (
+  refInfo: CamelotKeyInfo,
+  trackInfo: CamelotKeyInfo
+) => {
+  // Check for ±7 steps (energy transitions)
+  const numberDiff = ((trackInfo.number - refInfo.number) + 12) % 12;
+  
+  if (numberDiff === 7) {
+    return {
+      semitoneShift: 1,
+      description: 'Energy Boost (+7 steps)'
+    };
+  } else if (numberDiff === 5) { // -7 steps = +5 steps in the other direction
+    return {
+      semitoneShift: -1,
+      description: 'Energy Drop (-7 steps)'
+    };
+  }
+
+  return null;
+};
+
 export const groupCompatibleTracks = (
   tracks: CompatibleTrack[]
 ): CompatibilityGroup[] => {
-  // Sort tracks within each group by:
-  // 1. Compatibility score (higher is better)
-  // 2. BPM change (less change is better)
-  // 3. Semitone shift (less shift is better)
-  const sortTracks = (tracks: CompatibleTrack[]) => {
-    return [...tracks].sort((a, b) => {
+  const groups: CompatibilityGroup[] = [
+    {
+      title: "🎯 Native Compatible Tracks",
+      icon: "target",
+      description: "Perfect matches using standard Camelot wheel rules",
+      tracks: tracks.filter(t => t.compatibility.type === 'native')
+    },
+    {
+      title: "🔀 Diagonal Blends",
+      icon: "shuffle",
+      description: "Creative transitions using diagonal movement on the Camelot wheel",
+      tracks: tracks.filter(t => t.compatibility.type === 'diagonal')
+    },
+    {
+      title: "⚡ Energy Transitions",
+      icon: "zap",
+      description: "Dramatic energy shifts using ±7 step movements",
+      tracks: tracks.filter(t => t.compatibility.type === 'energy')
+    },
+    {
+      title: "🎚️ Transposed Options",
+      icon: "sliders",
+      description: "Compatible after transposing the selected track",
+      tracks: tracks.filter(t => t.compatibility.type === 'transposed')
+    }
+  ];
+
+  // Sort tracks within each group by score
+  groups.forEach(group => {
+    group.tracks.sort((a, b) => {
       // First by compatibility score
       if (b.compatibility.score !== a.compatibility.score) {
         return b.compatibility.score - a.compatibility.score;
       }
-      // Then by absolute BPM change
-      const bpmDiffA = Math.abs(a.compatibility.bpmAdjustment);
-      const bpmDiffB = Math.abs(b.compatibility.bpmAdjustment);
-      if (bpmDiffA !== bpmDiffB) {
-        return bpmDiffA - bpmDiffB;
-      }
-      // Finally by absolute semitone shift
-      return Math.abs(a.compatibility.semitoneShift) - Math.abs(b.compatibility.semitoneShift);
+      // Then by BPM adjustment
+      return Math.abs(a.compatibility.bpmAdjustment) - Math.abs(b.compatibility.bpmAdjustment);
     });
-  };
-
-  const groups: CompatibilityGroup[] = [
-    {
-      title: "Native Compatible Tracks",
-      description: "These tracks are naturally compatible without any pitch shifting",
-      tracks: sortTracks(tracks.filter(t => 
-        ['exact', 'adjacent', 'relative'].includes(t.compatibility.type)
-      ))
-    },
-    {
-      title: "Pitch Shifted Compatible Tracks",
-      description: "These tracks become compatible when pitch shifted",
-      tracks: sortTracks(tracks.filter(t => 
-        ['pitch-shift-up', 'pitch-shift-down'].includes(t.compatibility.type)
-      ))
-    },
-    {
-      title: "BPM Matched Tracks",
-      description: "These tracks are compatible when matching BPM without pitch lock",
-      tracks: sortTracks(tracks.filter(t => t.compatibility.type === 'bpm-match'))
-    }
-  ];
+  });
 
   // Remove empty groups
   return groups.filter(group => group.tracks.length > 0);

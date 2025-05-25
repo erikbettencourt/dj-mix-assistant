@@ -1,7 +1,7 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CompatibleTrack, CompatibilityGroup } from '../types';
-import { ArrowUp, ArrowDown, Music, HelpCircle } from 'lucide-react';
+import { ArrowUp, ArrowDown, Music, HelpCircle, Target, Shuffle, Zap, Sliders } from 'lucide-react';
 
 interface CompatibilityResultsProps {
   groups: CompatibilityGroup[];
@@ -9,6 +9,8 @@ interface CompatibilityResultsProps {
 }
 
 const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = [], onTrackSelect }) => {
+  const [activeTab, setActiveTab] = useState<number>(0);
+
   if (!groups || groups.length === 0) {
     return (
       <motion.div
@@ -24,6 +26,14 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
     );
   }
 
+  const getTabIcon = (title: string) => {
+    if (title.includes('Native')) return <Target size={16} />;
+    if (title.includes('Diagonal')) return <Shuffle size={16} />;
+    if (title.includes('Energy')) return <Zap size={16} />;
+    if (title.includes('Transposed')) return <Sliders size={16} />;
+    return <Music size={16} />;
+  };
+
   return (
     <motion.div
       className="space-y-8 mt-8"
@@ -31,11 +41,42 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
     >
-      {groups.map((group, groupIndex) => (
-        <div key={group.title} className="bg-gray-900 rounded-lg border border-gray-800">
+      {/* Tabs */}
+      <div className="sticky top-0 z-10 bg-gray-950 pt-4 pb-2 -mx-4 px-4 shadow-lg">
+        <div className="flex space-x-1 overflow-x-auto pb-2 scrollbar-hide">
+          {groups.map((group, index) => (
+            <button
+              key={group.title}
+              onClick={() => setActiveTab(index)}
+              className={`
+                flex items-center px-4 py-2 rounded-lg whitespace-nowrap transition-colors duration-200
+                ${activeTab === index 
+                  ? 'bg-primary-600 text-white' 
+                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}
+              `}
+            >
+              <span className="flex items-center gap-2">
+                {getTabIcon(group.title)}
+                <span>{group.title} ({group.tracks.length})</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Active Group Content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="bg-gray-900 rounded-lg border border-gray-800"
+        >
           <div className="p-4 border-b border-gray-800">
-            <h2 className="text-xl font-semibold text-white">{group.title} ({group.tracks.length})</h2>
-            <p className="text-gray-400 text-sm">{group.description}</p>
+            <h2 className="text-xl font-semibold text-white">{groups[activeTab].title}</h2>
+            <p className="text-gray-400 text-sm">{groups[activeTab].description}</p>
           </div>
 
           <div className="overflow-x-auto">
@@ -50,7 +91,7 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
                 </tr>
               </thead>
               <tbody>
-                {group.tracks.map((track) => {
+                {groups[activeTab].tracks.map((track) => {
                   const bpmChange = ((track.adjustedBpm - track.originalBpm) / track.originalBpm) * 100;
                   const keyChanged = track.originalKey !== track.shiftedKey;
                   
@@ -128,24 +169,22 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
               </tbody>
             </table>
           </div>
-        </div>
-      ))}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 };
 
 const getCompatibilityStyle = (type: string): string => {
   switch (type) {
-    case 'exact':
-      return 'bg-success-500 text-white';
-    case 'adjacent':
-    case 'relative':
+    case 'native':
       return 'bg-success-600 text-white';
-    case 'pitch-shift-up':
-    case 'pitch-shift-down':
+    case 'diagonal':
       return 'bg-accent-600 text-white';
-    case 'bpm-match':
+    case 'energy':
       return 'bg-secondary-600 text-white';
+    case 'transposed':
+      return 'bg-primary-600 text-white';
     default:
       return 'bg-gray-600 text-white';
   }

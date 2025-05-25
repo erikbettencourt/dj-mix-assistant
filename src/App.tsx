@@ -21,7 +21,6 @@ function App() {
   const [compatibleTracks, setCompatibleTracks] = useState<CompatibleTrack[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [editedBpm, setEditedBpm] = useState<number | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | undefined>();
   const [selectedTrackHistory, setSelectedTrackHistory] = useState<CompatibleTrack[]>([]);
 
@@ -44,7 +43,6 @@ function App() {
       // Reset selection and results
       setSelectedTrack(null);
       setCompatibleTracks([]);
-      setEditedBpm(null);
       setSelectedTrackHistory([]);
       navigate('/');
     } catch (error) {
@@ -61,7 +59,6 @@ function App() {
     setCurrentFileName('sample-data.xml');
     setSelectedTrack(null);
     setCompatibleTracks([]);
-    setEditedBpm(null);
     setSelectedTrackHistory([]);
     setError(null);
     navigate('/');
@@ -72,7 +69,6 @@ function App() {
     setTracks([]);
     setSelectedTrack(null);
     setCompatibleTracks([]);
-    setEditedBpm(null);
     setCurrentFileName(undefined);
     setError(null);
     setSelectedTrackHistory([]);
@@ -84,7 +80,6 @@ function App() {
     if (!track) {
       setSelectedTrack(null);
       setCompatibleTracks([]);
-      setEditedBpm(null);
       setSelectedTrackHistory([]);
       navigate('/');
       return;
@@ -96,7 +91,6 @@ function App() {
     };
     
     setSelectedTrack(trackWithCamelot);
-    setEditedBpm(null);
     
     // Find compatible tracks
     const compatible = findCompatibleTracks(trackWithCamelot, tracks);
@@ -115,7 +109,6 @@ function App() {
       };
       
       setSelectedTrack(trackWithCamelot);
-      setEditedBpm(track.adjustedBpm);
       
       // Find compatible tracks with the adjusted BPM and shifted key
       const modifiedTrack = {
@@ -133,40 +126,11 @@ function App() {
     }
   };
 
-  // Handle BPM change
-  const handleBpmChange = (value: string) => {
-    if (!selectedTrack) return;
-
-    const newBpm = Math.round(parseFloat(value));
-    if (isNaN(newBpm) || newBpm <= 0) return;
-
-    setEditedBpm(newBpm);
-    
-    // Create modified reference track with new BPM and potentially shifted key
-    const modifiedTrack = {
-      ...selectedTrack,
-      bpm: newBpm
-    };
-
-    // Recalculate compatible tracks with new BPM and shifted key
-    const compatible = findCompatibleTracks(modifiedTrack, tracks);
-    setCompatibleTracks(compatible);
-  };
-
-  // Reset BPM to original value
-  const handleResetBpm = () => {
-    if (!selectedTrack) return;
-    setEditedBpm(null);
-    const compatible = findCompatibleTracks(selectedTrack, tracks);
-    setCompatibleTracks(compatible);
-  };
-
   // Handle breadcrumb navigation
   const handleBreadcrumbClick = (index: number) => {
     if (index === -1) {
       setSelectedTrack(null);
       setCompatibleTracks([]);
-      setEditedBpm(null);
       setSelectedTrackHistory([]);
       navigate('/');
       return;
@@ -181,7 +145,6 @@ function App() {
       ...track,
       camelotKey: convertToCalemot(track.key)
     });
-    setEditedBpm(track.adjustedBpm);
     
     const modifiedTrack = {
       ...track,
@@ -241,83 +204,48 @@ function App() {
           <Route path="/track/:trackId" element={
             selectedTrack ? (
               <div className="space-y-8">
-                <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto">
-                  <button
-                    onClick={() => handleBreadcrumbClick(-1)}
-                    className="text-gray-400 hover:text-white transition-colors duration-200"
-                  >
-                    Playlist
-                  </button>
-                  <span className="text-gray-500">/</span>
-                  {selectedTrackHistory.map((track, index) => (
-                    <React.Fragment key={`${track.id}-${index}`}>
-                      <button
-                        onClick={() => handleBreadcrumbClick(index)}
-                        className={`text-gray-300 hover:text-white transition-colors duration-200 ${
-                          index === selectedTrackHistory.length - 1 ? 'cursor-default' : ''
-                        }`}
-                        disabled={index === selectedTrackHistory.length - 1}
-                      >
-                        {track.title} {index === 0 && `(${track.bpm} BPM)`}
-                      </button>
-                      {index < selectedTrackHistory.length - 1 && (
-                        <span className="text-gray-500">/</span>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
+                <div className="sticky top-0 z-20 bg-gray-950 pt-4 -mx-4 px-4 shadow-lg">
+                  <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto">
+                    <button
+                      onClick={() => handleBreadcrumbClick(-1)}
+                      className="text-gray-400 hover:text-white transition-colors duration-200"
+                    >
+                      Playlist
+                    </button>
+                    <span className="text-gray-500">/</span>
+                    {selectedTrackHistory.map((track, index) => (
+                      <React.Fragment key={`${track.id}-${index}`}>
+                        <button
+                          onClick={() => handleBreadcrumbClick(index)}
+                          className={`text-gray-300 hover:text-white transition-colors duration-200 ${
+                            index === selectedTrackHistory.length - 1 ? 'cursor-default' : ''
+                          }`}
+                          disabled={index === selectedTrackHistory.length - 1}
+                        >
+                          {track.title} {index === 0 && `(${track.bpm} BPM)`}
+                        </button>
+                        {index < selectedTrackHistory.length - 1 && (
+                          <span className="text-gray-500">/</span>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
 
-                <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
-                      <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
-                    </div>
-                    <div className="flex items-center gap-8">
-                      <div>
-                        <span className="text-sm text-gray-400 mb-1 block">BPM</span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={editedBpm !== null ? editedBpm : Math.round(selectedTrack.bpm)}
-                            onChange={(e) => handleBpmChange(e.target.value)}
-                            className={`
-                              w-24 text-lg font-mono rounded px-2 py-1
-                              ${editedBpm !== null 
-                                ? 'bg-primary-900/30 border-primary-500 text-primary-200' 
-                                : 'bg-gray-800 border-gray-700 text-gray-200'
-                              }
-                              border focus:outline-none focus:ring-2 focus:ring-primary-500
-                            `}
-                            min="1"
-                            step="1"
-                          />
-                          {editedBpm !== null && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-500 font-mono">
-                                ({Math.round(selectedTrack.bpm)})
-                              </span>
-                              <button
-                                onClick={handleResetBpm}
-                                className="p-1.5 hover:bg-gray-800 rounded-full transition-colors group"
-                                title="Reset to original BPM"
-                              >
-                                <RotateCcw size={16} className="text-gray-400 group-hover:text-white" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                  <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <h4 className="text-3xl font-bold text-white">{selectedTrack.title}</h4>
+                        <p className="text-xl text-gray-300">by {selectedTrack.artist}</p>
                       </div>
-                      <div>
-                        <span className="text-sm text-gray-400 mb-1 block">Key</span>
-                        <p className="text-lg">
-                          {editedBpm !== null && compatibleTracks.length > 0
-                            ? compatibleTracks[0].shiftedCamelotKey
-                            : selectedTrack.camelotKey}
-                          <span className="text-gray-500 ml-2">
-                            ({selectedTrack.camelotKey})
-                          </span>
-                        </p>
+                      <div className="flex items-center gap-8">
+                        <div>
+                          <span className="text-sm text-gray-400 mb-1 block">BPM</span>
+                          <p className="text-lg font-mono">{Math.round(selectedTrack.bpm)}</p>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-400 mb-1 block">Key</span>
+                          <p className="text-lg">{selectedTrack.camelotKey}</p>
+                        </div>
                       </div>
                     </div>
                   </div>

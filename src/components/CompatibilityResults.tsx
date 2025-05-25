@@ -101,7 +101,6 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
               <tbody>
                 {groups[activeTab].tracks.map((track) => {
                   const bpmChange = ((track.adjustedBpm - track.originalBpm) / track.originalBpm) * 100;
-                  const keyChanged = track.originalKey !== track.shiftedKey;
                   
                   return (
                     <tr
@@ -139,21 +138,9 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {keyChanged ? (
-                          <div className="flex items-center justify-center space-x-2">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
-                              {track.camelotKey}
-                            </span>
-                            <span className="text-gray-500">→</span>
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-accent-800/50 border border-accent-700/50 text-accent-200">
-                              {track.shiftedCamelotKey}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
-                            {track.camelotKey}
-                          </span>
-                        )}
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300">
+                          {track.camelotKey}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center">

@@ -84,7 +84,7 @@ const CompatibilityResults: React.FC<CompatibilityResultsProps> = ({ groups = []
         >
           <div className="p-4 border-b border-gray-800">
             <h2 className="text-xl font-semibold text-white">{groups[activeTab].title}</h2>
-            <p className="text-gray-400 text-sm max-w-[50%]">{groups[activeTab].description}</p>
+            <p className="text-gray-400 text-sm">{groups[activeTab].description}</p>
           </div>
 
           <div className="overflow-x-auto">

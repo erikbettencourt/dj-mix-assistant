@@ -22,6 +22,9 @@ export const findCompatibleTracks = (
   const energyBoostCamelot = convertToCalemot(energyBoostKey);
   const energyDropCamelot = convertToCalemot(energyDropKey);
 
+  // Track IDs that have already been matched at a lower semitone shift
+  const matchedTrackIds = new Set<string>();
+
   return allTracks
     .filter(track => track.id !== referenceTrack.id)
     .flatMap(track => {
@@ -51,56 +54,72 @@ export const findCompatibleTracks = (
           description: nativeCompatibility.description,
           score: 100 - (bpmDiff * 2)
         }, referenceTrack.bpm));
+        matchedTrackIds.add(track.id);
       }
 
-      // 2. Check Diagonal Blend
-      const diagonalCompatibility = checkDiagonalCompatibility(refKeyInfo, trackKeyInfo);
-      if (diagonalCompatibility) {
-        compatibleTracks.push(createCompatibleTrack(track, {
-          type: 'diagonal',
-          semitoneShift: 0,
-          bpmAdjustment,
-          description: diagonalCompatibility.description,
-          score: 85 - (bpmDiff * 2)
-        }, referenceTrack.bpm));
-      }
-
-      // 3. Check Energy Transitions
-      // Compare track's original key with the energy transition target keys
-      if (trackCamelotKey === energyBoostCamelot) {
-        compatibleTracks.push(createCompatibleTrack(track, {
-          type: 'energy',
-          semitoneShift: 1,
-          bpmAdjustment,
-          description: 'Energy Boost (+7 steps)',
-          score: 75 - (bpmDiff * 2)
-        }, referenceTrack.bpm));
-      } else if (trackCamelotKey === energyDropCamelot) {
-        compatibleTracks.push(createCompatibleTrack(track, {
-          type: 'energy',
-          semitoneShift: -1,
-          bpmAdjustment,
-          description: 'Energy Drop (-7 steps)',
-          score: 75 - (bpmDiff * 2)
-        }, referenceTrack.bpm));
-      }
-
-      // 4. Check Transposed Compatibility
-      for (let shift = -3; shift <= 3; shift++) {
-        if (shift === 0 || Math.abs(shift) === 1) continue; // Skip 0 and ±1 as they're handled by energy transitions
-
-        const transposedKey = calculateKeyShift(refKeyInfo.key, shift);
-        const transposedCamelotKey = convertToCalemot(transposedKey);
-        const compatibility = determineCompatibility(transposedCamelotKey, trackCamelotKey);
-
-        if (compatibility.type === 'native') {
+      // 2. Check Diagonal Blend (if not already matched)
+      if (!matchedTrackIds.has(track.id)) {
+        const diagonalCompatibility = checkDiagonalCompatibility(refKeyInfo, trackKeyInfo);
+        if (diagonalCompatibility) {
           compatibleTracks.push(createCompatibleTrack(track, {
-            type: 'transposed',
-            semitoneShift: shift,
+            type: 'diagonal',
+            semitoneShift: 0,
             bpmAdjustment,
-            description: `${shift > 0 ? '+' : '-'}${Math.abs(shift)} semitone${Math.abs(shift) > 1 ? 's' : ''}`,
-            score: 70 - (Math.abs(shift) * 5) - (bpmDiff * 2)
+            description: diagonalCompatibility.description,
+            score: 85 - (bpmDiff * 2)
           }, referenceTrack.bpm));
+          matchedTrackIds.add(track.id);
+        }
+      }
+
+      // 3. Check Energy Transitions (if not already matched)
+      if (!matchedTrackIds.has(track.id)) {
+        if (trackCamelotKey === energyBoostCamelot) {
+          compatibleTracks.push(createCompatibleTrack(track, {
+            type: 'energy',
+            semitoneShift: 1,
+            bpmAdjustment,
+            description: '+7',
+            score: 75 - (bpmDiff * 2)
+          }, referenceTrack.bpm));
+          matchedTrackIds.add(track.id);
+        } else if (trackCamelotKey === energyDropCamelot) {
+          compatibleTracks.push(createCompatibleTrack(track, {
+            type: 'energy',
+            semitoneShift: -1,
+            bpmAdjustment,
+            description: '-7',
+            score: 75 - (bpmDiff * 2)
+          }, referenceTrack.bpm));
+          matchedTrackIds.add(track.id);
+        }
+      }
+
+      // 4. Check Transposed Compatibility (if not already matched)
+      if (!matchedTrackIds.has(track.id)) {
+        // Try each possible semitone shift
+        for (let shift = -3; shift <= 3; shift++) {
+          // Skip 0 and ±1 as they're handled by native and energy transitions
+          if (shift === 0 || Math.abs(shift) === 1) continue;
+
+          // Calculate what this track's key would be if shifted
+          const shiftedKey = calculateKeyShift(track.key, shift);
+          const shiftedCamelotKey = convertToCalemot(shiftedKey);
+          
+          // Check if the shifted key would be compatible with the reference
+          const compatibility = determineCompatibility(refCamelotKey, shiftedCamelotKey);
+
+          if (compatibility.type === 'native') {
+            compatibleTracks.push(createCompatibleTrack(track, {
+              type: 'transposed',
+              semitoneShift: shift,
+              bpmAdjustment,
+              description: `${shift > 0 ? '+' : ''}${shift}`,
+              score: 70 - (Math.abs(shift) * 5) - (bpmDiff * 2)
+            }, referenceTrack.bpm));
+            matchedTrackIds.add(track.id);
+            break; // Only use the first valid transposition
+          }
         }
       }
 
@@ -158,13 +177,13 @@ export const groupCompatibleTracks = (
     {
       title: "Energy Transitions",
       icon: "zap",
-      description: "Dramatic energy shifts using ±7 step movements. These tracks become compatible when the selected track is transposed by ±1 semitone, creating powerful transitions during breakdowns or when mixing instrumental sections.",
+      description: "Dramatic energy shifts using ±7 step movements on the Camelot wheel. These matches reflect potential harmonic compatibility unlocked by pitch-shifting the selected track by ±1 semitone.",
       tracks: tracks.filter(t => t.compatibility.type === 'energy')
     },
     {
       title: "Transposed Options",
       icon: "sliders",
-      description: "Compatible matches when transposing the selected track by ±2 to ±3 semitones. These tracks become harmonically compatible after pitch shifting the reference track. Best used in DAWs or when performing with pitch control.",
+      description: "Tracks that become compatible if they are transposed by ±2–3 semitones. These matches reflect potential harmonic compatibility unlocked by pitch-shifting other songs in your library.",
       tracks: tracks.filter(t => t.compatibility.type === 'transposed')
     }
   ];
